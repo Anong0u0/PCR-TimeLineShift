@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>PCR補償刀時間軸轉換小工具</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;700&family=Noto+Sans+TC:wght@300;400;500;700&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap"
+        rel="stylesheet">
+
+    <!-- Highlight.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="antialiased">
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header glass-effect">
+            <div class="container header-content">
+                <div class="header-title-group">
+                    <svg class="icon header-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <h1>PCR補償刀時間軸轉換小工具</h1>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content container">
+
+            <!-- Controls -->
+            <div class="controls-panel">
+                <div class="controls-wrapper">
+                    <!-- Settings Input -->
+                    <div class="control-group">
+                        <label><b>剩餘秒數 (0-90):</b></label>
+                        <div class="input-wrapper">
+                            <div class="number-input-group">
+                                <button id="btn-minus" class="input-btn">-</button>
+                                <input type="number" id="seconds-input" value="90" min="0" max="90">
+                                <button id="btn-plus" class="input-btn">+</button>
+                            </div>
+                            <input type="range" id="seconds-slider" min="0" max="90" value="90" class="slider">
+                        </div>
+                    </div>
+
+                    <!-- Options -->
+                    <div class="control-group options-group">
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" checked id="hide-low-time">
+                            <label for="hide-low-time">隱藏&lt;1秒軸</label>
+                        </div>
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="strict-mode">
+                            <label for="strict-mode">嚴格模式 (只匹配每行的第一組時間)</label>
+                            <div class="tooltip-container">
+                                <svg class="icon tooltip-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                <div class="tooltip">
+                                    開啟後，每行只有發現的第一個時間數字會被調整，後續的數字將保持原樣。
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Editors Area -->
+            <div class="editors-area">
+
+                <!-- Input Panel -->
+                <div class="editor-panel white-panel" id="input-panel">
+                    <div class="panel-header collapsible-header" id="input-header-toggle" title="點擊以收縮/展開">
+                        <span class="header-title">原始軸 (輸入)</span>
+                        <div class="toggle-wrapper">
+                            <span class="toggle-label">收縮</span>
+                            <svg class="icon chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <textarea id="input-text" placeholder="請在此貼上時間軸...">戰鬥開始Auto off（xoooo）
+
+　113 格蕾斯 → oooxo（軍病 on，格蕾斯 off）
+★ 102-101 格蕾斯（押1技「亡靈墜擊」buff，格蕾斯下墜後轉頭）
+　　 　→ ooooo（格蕾斯 on）
+　100 格蕾斯 → ooxox（貓賊、大冬 off），Auto on
+　054 貓賊（Auto）→ ooooo（貓賊、大冬 on）
+　046 格蕾斯 → oooxo（格蕾斯 off），Auto off</textarea>
+                    </div>
+                </div>
+
+                <!-- Desktop Arrow -->
+                <div class="arrow-separator">
+                    <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </div>
+
+                <!-- Output Panel -->
+                <div class="editor-panel dark-panel">
+                    <div class="panel-header dark-header">
+                        <div class="header-left">
+                            <svg class="icon text-blue" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="16 18 22 12 16 6"></polyline>
+                                <polyline points="8 6 2 12 8 18"></polyline>
+                            </svg>
+                            <span>調整後結果</span>
+                        </div>
+                        <button id="copy-btn" class="copy-btn">
+                            <span class="btn-content default-state">
+                                <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                複製結果
+                            </span>
+                            <span class="btn-content copied-state" style="display: none;">
+                                <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                已複製
+                            </span>
+                        </button>
+                    </div>
+                    <div class="code-content custom-scrollbar">
+                        <pre><code id="output-code" class="language-cs"></code></pre>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
