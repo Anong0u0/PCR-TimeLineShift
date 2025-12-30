@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const strictModeCheckbox = document.getElementById('strict-mode');
     const hideLowTimeCheckbox = document.getElementById('hide-low-time');
     const ignoreCommentCheckbox = document.getElementById('ignore-comment');
+    const highlightTimeCheckbox = document.getElementById('highlight-time');
     const copyBtn = document.getElementById('copy-btn');
     const btnContentDefault = copyBtn.querySelector('.default-state');
     const btnContentCopied = copyBtn.querySelector('.copied-state');
@@ -16,6 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let strictMode = false;
     let hideLowTime = true;
     let matchCommentTime = false;
+    let highlightTime = false;
+    const highlightMarker = '󠉑'; // \ue0251
+
     const toHalfwidthDigits = (value) => value.replace(/[０-９]/g, (digit) =>
         String.fromCharCode(digit.charCodeAt(0) - 0xFF10 + 0x30));
     const toFullwidthDigits = (value) => value.replace(/\d/g, (digit) =>
@@ -28,6 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return useFullwidth ? toFullwidthDigits(digit) : digit;
         })
         .join('');
+    const wrapHighlightMarker = (value) => highlightTime
+        ? `${highlightMarker}${value}${highlightMarker}`
+        : value;
 
     const processText = () => {
         const text = inputText.value;
@@ -110,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const formattedSec = applyDigitWidth(newSec.toString().padStart(secondsWidth, '0'), secondPattern);
                 const separator = hasColon ? colon : '';
 
-                return `${sign}${formattedMin}${separator}${formattedSec}`;
+                return wrapHighlightMarker(`${sign}${formattedMin}${separator}${formattedSec}`);
             });
 
             if (matchCount > 0) {
@@ -137,10 +144,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         outputCode.textContent = processedLines.join('\n');
-
         if (window.hljs) {
             outputCode.removeAttribute('data-highlighted');
             hljs.highlightElement(outputCode);
+        }
+        if (highlightTime) {
+            const parts = outputCode.innerHTML.split(highlightMarker);
+            if (parts.length > 1) {
+                outputCode.innerHTML = parts
+                    .map((part, index) => index % 2 === 1
+                        ? `<span class="time-highlight">${part}</span>`
+                        : part)
+                    .join('');
+            }
         }
     };
 
@@ -196,6 +212,12 @@ document.addEventListener('DOMContentLoaded', () => {
     ignoreCommentCheckbox.addEventListener('change', (e) => {
         matchCommentTime = e.target.checked;
         localStorage.setItem('pcr_timeline_ignore_comment', matchCommentTime);
+        processText();
+    });
+
+    highlightTimeCheckbox.addEventListener('change', (e) => {
+        highlightTime = e.target.checked;
+        localStorage.setItem('pcr_timeline_highlight_time', highlightTime);
         processText();
     });
 
@@ -289,6 +311,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedIgnoreComment !== null) {
         matchCommentTime = (savedIgnoreComment === 'true');
         ignoreCommentCheckbox.checked = matchCommentTime;
+    }
+
+    const savedHighlightTime = localStorage.getItem('pcr_timeline_highlight_time');
+    if (savedHighlightTime !== null) {
+        highlightTime = (savedHighlightTime === 'true');
+        highlightTimeCheckbox.checked = highlightTime;
     }
 
     processText();

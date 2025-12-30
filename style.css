@@ -23,6 +23,7 @@
     --color-white: #ffffff;
     --color-danger: #ef4444;
     --color-success: #22c55e;
+    --bg-time-highlight: rgba(253, 224, 71, 0.45);
 
     /* Semantic Colors - Light (Default) */
     --bg-app: var(--color-slate-50);
@@ -87,6 +88,7 @@
     --color-slate-800: #f8fafc;
 
     --shadow-color: rgb(0 0 0 / 0.3);
+    --bg-time-highlight: rgba(251, 191, 36, 0.25);
 }
 
 /* =========================================
@@ -615,6 +617,12 @@ code {
     font-size: 0.9rem;
     color: #d4d4d4;
     /* VS Code default text */
+}
+
+.time-highlight {
+    background-color: var(--bg-time-highlight);
+    border-radius: 4px;
+    padding: 0 2px;
 }
 
 /* Highlight.js Overrides (Resurrected) */
