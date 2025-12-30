@@ -448,7 +448,7 @@ h1 {
     width: max-content;
     max-width: 250px;
     background: var(--color-slate-800);
-    color: var(--color-white);
+    color: var(--bg-app);
     padding: 0.5rem 0.75rem;
     border-radius: var(--radius-sm);
     font-size: 0.75rem;
