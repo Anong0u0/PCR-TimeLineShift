@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnContentCopied = copyBtn.querySelector('.copied-state');
 
     // State
-    let remainingSeconds = 30;
+    let remainingSeconds = 90;
     let strictMode = false;
     let hideLowTime = true;
 
