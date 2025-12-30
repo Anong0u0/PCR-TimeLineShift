@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPlus = document.getElementById('btn-plus');
     const strictModeCheckbox = document.getElementById('strict-mode');
     const hideLowTimeCheckbox = document.getElementById('hide-low-time');
+    const ignoreCommentCheckbox = document.getElementById('ignore-comment');
     const copyBtn = document.getElementById('copy-btn');
     const btnContentDefault = copyBtn.querySelector('.default-state');
     const btnContentCopied = copyBtn.querySelector('.copied-state');
@@ -14,6 +15,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let remainingSeconds = 90;
     let strictMode = false;
     let hideLowTime = true;
+    let matchCommentTime = false;
+    const toHalfwidthDigits = (value) => value.replace(/[０-９]/g, (digit) =>
+        String.fromCharCode(digit.charCodeAt(0) - 0xFF10 + 0x30));
+    const toFullwidthDigits = (value) => value.replace(/\d/g, (digit) =>
+        String.fromCharCode(digit.charCodeAt(0) + 0xFF10 - 0x30));
+    const getDigitPattern = (value) => value.split('').map((digit) => /[０-９]/.test(digit));
+    const applyDigitWidth = (value, pattern) => value
+        .split('')
+        .map((digit, index) => {
+            const useFullwidth = pattern[index] ?? pattern[pattern.length - 1] ?? false;
+            return useFullwidth ? toFullwidthDigits(digit) : digit;
+        })
+        .join('');
 
     const processText = () => {
         const text = inputText.value;
@@ -27,77 +41,85 @@ document.addEventListener('DOMContentLoaded', () => {
         let warningShown = false;
         let shouldSkipFollowers = false;
 
-        lines.forEach(line => {
-            if (/https?:\/\//.test(line)) return processedLines.push(line);
-            if (line.startsWith('//')) return processedLines.push(line);
+        lines.forEach((line) => {
+            if (/https?:\/\//.test(line)) {
+                processedLines.push(line);
+                return;
+            }
+
+            let commentIndex = -1;
+            if (!matchCommentTime) {
+                const hashIndex = line.indexOf('#');
+                const slashIndex = line.indexOf('//');
+                if (hashIndex !== -1 && (slashIndex === -1 || hashIndex < slashIndex)) {
+                    commentIndex = hashIndex;
+                } else if (slashIndex !== -1) {
+                    commentIndex = slashIndex;
+                }
+            }
+
+            if (commentIndex === 0) {
+                processedLines.push(line);
+                return;
+            }
+
+            const lineToProcess = commentIndex > -1 ? line.slice(0, commentIndex) : line;
+            const commentTail = commentIndex > -1 ? line.slice(commentIndex) : '';
 
             let matchCount = 0;
             let lineHasLowTime = false;
 
-            const lineRegex = /(?<![,.\drRkK])(?:(0?[01]?):([0-5]\d)|(?<!:)(0?[01]??)([0-5]\d)(?!:))(?![\dwW\-])/g;
+            const lineRegex = /(?<![,.\drRkKvV０-９])(?:(?<minuteColon>[0０]?[01０１]?)(?<colon>[:：])(?<secondColon>[0-5０-５][\d０-９])|(?<![:：])(?<minuteCompact>[0０]?[01０１]??)(?<secondCompact>[0-5０-５][\d０-９])(?![:：]))(?![\dwW\-０-９])/g;
 
-            const processedLine = line.replace(lineRegex, (match, p1, p2, p3, p4) => {
+            const processedLine = lineToProcess.replace(lineRegex, (match, ...args) => {
+                const groups = args[args.length - 1] || {};
+                const { minuteColon, secondColon, minuteCompact, secondCompact, colon } = groups;
                 if (strictMode && matchCount > 0) {
                     return match;
                 }
 
-                let minutes = 0;
-                let seconds = 0;
-                const hasColon = match.includes(':');
-                const minutesPart = hasColon ? p1 : p3;
-                const secondsPart = hasColon ? p2 : p4;
+                const hasColon = Boolean(colon);
+                const minutesPart = hasColon ? minuteColon : minuteCompact;
+                const secondsPart = hasColon ? secondColon : secondCompact;
+                const minutePattern = minutesPart ? getDigitPattern(minutesPart) : [];
+                const secondPattern = secondsPart ? getDigitPattern(secondsPart) : [];
+                const minutes = minutesPart ? parseInt(toHalfwidthDigits(minutesPart), 10) : 0;
+                const seconds = parseInt(toHalfwidthDigits(secondsPart), 10);
 
-                if (minutesPart && minutesPart.length > 0) {
-                    minutes = parseInt(minutesPart, 10);
-                }
-                seconds = parseInt(secondsPart, 10);
-
-                let totalSeconds = minutes * 60 + seconds;
-                let newTotalSeconds = totalSeconds + offset;
+                const newTotalSeconds = minutes * 60 + seconds + offset;
 
                 if (newTotalSeconds < 1) {
                     lineHasLowTime = true;
                 }
 
                 const isNegative = newTotalSeconds < 0;
-                let absSeconds = Math.abs(newTotalSeconds);
+                const absSeconds = Math.abs(newTotalSeconds);
 
-                let newMin = Math.floor(absSeconds / 60);
-                let newSec = absSeconds % 60;
+                const newMin = Math.floor(absSeconds / 60);
+                const newSec = absSeconds % 60;
                 const minutesWidth = minutesPart ? minutesPart.length : 0;
                 const secondsWidth = secondsPart ? secondsPart.length : 0;
                 const sign = isNegative ? '-' : '';
 
                 matchCount++;
 
-                if (hasColon) {
-                    const minWidth = Math.max(1, minutesWidth);
-                    const formattedMin = newMin.toString().padStart(minWidth, '0');
-                    const formattedSec = newSec.toString().padStart(secondsWidth, '0');
-                    return `${sign}${formattedMin}:${formattedSec}`;
-                }
+                const minWidth = hasColon ? Math.max(1, minutesWidth) : minutesWidth;
+                const formattedMin = minWidth > 0
+                    ? applyDigitWidth(newMin.toString().padStart(minWidth, '0'), minutePattern)
+                    : '';
+                const formattedSec = applyDigitWidth(newSec.toString().padStart(secondsWidth, '0'), secondPattern);
+                const separator = hasColon ? colon : '';
 
-                if (minutesWidth > 0) {
-                    const formattedMin = newMin.toString().padStart(minutesWidth, '0');
-                    const formattedSec = newSec.toString().padStart(secondsWidth, '0');
-                    return `${sign}${formattedMin}${formattedSec}`;
-                }
-
-                const formattedSec = newSec.toString().padStart(secondsWidth, '0');
-                return `${sign}${formattedSec}`;
+                return `${sign}${formattedMin}${separator}${formattedSec}`;
             });
 
             if (matchCount > 0) {
-                if (lineHasLowTime && hideLowTime) {
-                    shouldSkipFollowers = true;
-                    return;
-                } else {
-                    shouldSkipFollowers = false;
-                }
-            } else {
+                shouldSkipFollowers = lineHasLowTime && hideLowTime;
                 if (shouldSkipFollowers) {
                     return;
                 }
+            } else if (shouldSkipFollowers) {
+                return;
             }
 
             if (lineHasLowTime && !warningShown) {
@@ -111,12 +133,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 warningShown = true;
             }
 
-            processedLines.push(processedLine);
+            processedLines.push(`${processedLine}${commentTail}`);
         });
 
-        const result = processedLines.join('\n');
-
-        outputCode.textContent = result;
+        outputCode.textContent = processedLines.join('\n');
 
         if (window.hljs) {
             outputCode.removeAttribute('data-highlighted');
@@ -170,6 +190,12 @@ document.addEventListener('DOMContentLoaded', () => {
     hideLowTimeCheckbox.addEventListener('change', (e) => {
         hideLowTime = e.target.checked;
         localStorage.setItem('pcr_timeline_hide_low', hideLowTime);
+        processText();
+    });
+
+    ignoreCommentCheckbox.addEventListener('change', (e) => {
+        matchCommentTime = e.target.checked;
+        localStorage.setItem('pcr_timeline_ignore_comment', matchCommentTime);
         processText();
     });
 
@@ -257,6 +283,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedHideLow !== null) {
         hideLowTime = (savedHideLow === 'true');
         hideLowTimeCheckbox.checked = hideLowTime;
+    }
+
+    const savedIgnoreComment = localStorage.getItem('pcr_timeline_ignore_comment');
+    if (savedIgnoreComment !== null) {
+        matchCommentTime = (savedIgnoreComment === 'true');
+        ignoreCommentCheckbox.checked = matchCommentTime;
     }
 
     processText();

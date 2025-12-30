@@ -83,6 +83,19 @@
                         <div class="checkbox-wrapper">
                             <input type="checkbox" checked id="hide-low-time">
                             <label for="hide-low-time">隱藏&lt;1秒軸</label>
+                            <div class="tooltip-container">
+                                <svg class="icon tooltip-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                <div class="tooltip">
+                                    開啟後，會隱藏所有時間小於1秒的行。<br>
+                                    否則以 <span style="color: green;">// === 補償時間不足 ===</span> 提示。
+                                </div>
+                            </div>
                         </div>
                         <div class="checkbox-wrapper">
                             <input type="checkbox" id="strict-mode">
@@ -97,6 +110,22 @@
                                 </svg>
                                 <div class="tooltip">
                                     開啟後，每行只有第一組時間數字會被調整，後續的數字將保持原樣。
+                                </div>
+                            </div>
+                        </div>
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="ignore-comment">
+                            <label for="ignore-comment">忽略註解</label>
+                            <div class="tooltip-container">
+                                <svg class="icon tooltip-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                <div class="tooltip">
+                                    預設註解(# 或 //)後方時間不轉換，開啟後會嘗試轉換。
                                 </div>
                             </div>
                         </div>
