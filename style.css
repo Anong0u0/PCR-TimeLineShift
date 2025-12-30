@@ -916,18 +916,7 @@ textarea:focus {
     background-color: var(--bg-app);
 }
 
-/* Make dark panel adhere to theme or stay dark?
-   Usually the "Output" is code, which often stays dark.
-   But the user might want a light mode code editor?
-   The existing .dark-panel has hardcoded dark colors.
-   Let's keep it hardcoded dark for now as it looks like a console/terminal.
-   But we should check if its border matches the theme.
-*/
 .dark-panel {
-    /* Keep hardcoded dark background for code output even in light mode?
-       Original was #1e1e1e.
-       Let's stick to that for now, but update border.
-    */
     background: #1e1e1e;
     /* Keep terminal dark */
     border-color: #333;
@@ -966,12 +955,7 @@ textarea:focus {
 }
 
 /* Dark Panel (Output) Refinements */
-/* Ensure the output code looks good */
 #output-code {
     font-family: var(--font-mono);
     line-height: 1.6;
 }
-
-/* If we want the output to be light in light mode, we would change this.
-   For now, I'll leave it as a "terminal view" which is typically dark.
-*/

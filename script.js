@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // DOM Elements
     const inputText = document.getElementById('input-text');
     const outputCode = document.getElementById('output-code');
     const secondsInput = document.getElementById('seconds-input');
@@ -12,12 +11,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnContentDefault = copyBtn.querySelector('.default-state');
     const btnContentCopied = copyBtn.querySelector('.copied-state');
 
-    // State
     let remainingSeconds = 90;
     let strictMode = false;
     let hideLowTime = true;
-
-    // --- Core Logic ---
 
     const processText = () => {
         const text = inputText.value;
@@ -25,7 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const lines = text.split('\n');
 
-        // Calculate max line length for separator padding
         const maxLineLength = lines.reduce((max, line) => Math.max(max, line.length), 0);
 
         const processedLines = [];
@@ -36,11 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
             let matchCount = 0;
             let lineHasLowTime = false;
 
-            // Regex from user requirements
             const lineRegex = /(?<!\d)([01]{0,2}?):?([0-5]?\d)(?!\d)/g;
 
             const processedLine = line.replace(lineRegex, (match, p1, p2) => {
-                // Strict Mode: Only replace the first match per line
                 if (match.length == 1 && match < 10 && match > 0) { return match; }
 
                 if (strictMode && matchCount > 0) {
@@ -58,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 let totalSeconds = minutes * 60 + seconds;
                 let newTotalSeconds = totalSeconds + offset;
 
-                // Check for low time warning (< 1 second)
                 if (newTotalSeconds < 1) {
                     lineHasLowTime = true;
                 }
@@ -85,7 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Logic check for hiding lines (Parent + Children)
             if (matchCount > 0) {
                 if (lineHasLowTime && hideLowTime) {
                     shouldSkipFollowers = true;
@@ -99,7 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Insert warning line if triggered
             if (lineHasLowTime && !warningShown) {
                 const baseText = "=== 補償時間不足 ===";
                 const totalPadding = Math.max(0, maxLineLength - baseText.length);
@@ -116,10 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const result = processedLines.join('\n');
 
-        // Update Output
         outputCode.textContent = result;
 
-        // Trigger Highlight.js
         if (window.hljs) {
             outputCode.removeAttribute('data-highlighted');
             hljs.highlightElement(outputCode);
@@ -127,11 +115,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const updateState = (newVal) => {
-        // Clamp 0-90
         let val = Math.max(0, Math.min(90, newVal));
         remainingSeconds = val;
 
-        // Sync Inputs
         secondsInput.value = val;
         secondsSlider.value = val;
 
@@ -140,15 +126,11 @@ document.addEventListener('DOMContentLoaded', () => {
         processText();
     };
 
-    // --- Event Listeners ---
-
-    // Input Text Change
     inputText.addEventListener('input', () => {
         localStorage.setItem('pcr_timeline_input', inputText.value);
         processText();
     });
 
-    // Number Input Change
     secondsInput.addEventListener('input', (e) => {
         let val = parseInt(e.target.value);
         if (!isNaN(val)) {
@@ -156,13 +138,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Slider Change
     secondsSlider.addEventListener('input', (e) => {
         let val = parseInt(e.target.value);
         updateState(val);
     });
 
-    // Plus/Minus Buttons
     btnMinus.addEventListener('click', () => {
         updateState(remainingSeconds - 1);
     });
@@ -171,21 +151,32 @@ document.addEventListener('DOMContentLoaded', () => {
         updateState(remainingSeconds + 1);
     });
 
-    // Strict Mode Toggle
     strictModeCheckbox.addEventListener('change', (e) => {
         strictMode = e.target.checked;
         localStorage.setItem('pcr_timeline_strict', strictMode);
         processText();
     });
 
-    // Hide Low Time Toggle
     hideLowTimeCheckbox.addEventListener('change', (e) => {
         hideLowTime = e.target.checked;
         localStorage.setItem('pcr_timeline_hide_low', hideLowTime);
         processText();
     });
 
-    // Input Panel Collapse Toggle
+    document.querySelectorAll('.checkbox-wrapper').forEach((wrapper) => {
+        const checkbox = wrapper.querySelector('input[type="checkbox"]');
+        if (!checkbox) {
+            return;
+        }
+
+        wrapper.addEventListener('click', (e) => {
+            if (e.target === checkbox || e.target.closest('label') || e.target.closest('.tooltip-container')) {
+                return;
+            }
+            checkbox.click();
+        });
+    });
+
     const inputPanel = document.getElementById('input-panel');
     const inputHeaderToggle = document.getElementById('input-header-toggle');
     const toggleLabel = inputHeaderToggle.querySelector('.toggle-label');
@@ -199,7 +190,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Copy Button
     copyBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(outputCode.textContent).then(() => {
             copyBtn.classList.add('copied');
@@ -214,7 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- Theme Logic ---
     const themeToggleBtn = document.getElementById('theme-toggle');
 
     const setTheme = (theme) => {
@@ -230,7 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
 
-    // Initialize Theme
     setTheme(getPreferredTheme());
 
     themeToggleBtn.addEventListener('click', () => {
@@ -239,7 +227,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setTheme(newTheme);
     });
 
-    // --- Initial Render ---
     const savedInput = localStorage.getItem('pcr_timeline_input');
     if (savedInput !== null) {
         inputText.value = savedInput;
@@ -248,13 +235,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedSeconds = localStorage.getItem('pcr_timeline_seconds');
     if (savedSeconds !== null) {
         updateState(parseInt(savedSeconds, 10));
-    } else {
-        // If no saved seconds, we might still have saved checkboxes, so we need to processText later
-        // But updateState calls processText.
-        // Let's handle checkboxes below.
     }
 
-    // Load Checkbox States
     const savedStrict = localStorage.getItem('pcr_timeline_strict');
     if (savedStrict !== null) {
         strictMode = (savedStrict === 'true');
@@ -267,8 +249,5 @@ document.addEventListener('DOMContentLoaded', () => {
         hideLowTimeCheckbox.checked = hideLowTime;
     }
 
-    // Now trigger processText to ensure UI reflects loaded state
-    if (savedSeconds === null) {
-        processText();
-    }
+    processText();
 });
