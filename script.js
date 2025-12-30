@@ -174,12 +174,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Strict Mode Toggle
     strictModeCheckbox.addEventListener('change', (e) => {
         strictMode = e.target.checked;
+        localStorage.setItem('pcr_timeline_strict', strictMode);
         processText();
     });
 
     // Hide Low Time Toggle
     hideLowTimeCheckbox.addEventListener('change', (e) => {
         hideLowTime = e.target.checked;
+        localStorage.setItem('pcr_timeline_hide_low', hideLowTime);
         processText();
     });
 
@@ -212,6 +214,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // --- Theme Logic ---
+    const themeToggleBtn = document.getElementById('theme-toggle');
+
+    const setTheme = (theme) => {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    }
+
+    const getPreferredTheme = () => {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            return savedTheme;
+        }
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    // Initialize Theme
+    setTheme(getPreferredTheme());
+
+    themeToggleBtn.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+    });
+
     // --- Initial Render ---
     const savedInput = localStorage.getItem('pcr_timeline_input');
     if (savedInput !== null) {
@@ -222,6 +249,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedSeconds !== null) {
         updateState(parseInt(savedSeconds, 10));
     } else {
+        // If no saved seconds, we might still have saved checkboxes, so we need to processText later
+        // But updateState calls processText.
+        // Let's handle checkboxes below.
+    }
+
+    // Load Checkbox States
+    const savedStrict = localStorage.getItem('pcr_timeline_strict');
+    if (savedStrict !== null) {
+        strictMode = (savedStrict === 'true');
+        strictModeCheckbox.checked = strictMode;
+    }
+
+    const savedHideLow = localStorage.getItem('pcr_timeline_hide_low');
+    if (savedHideLow !== null) {
+        hideLowTime = (savedHideLow === 'true');
+        hideLowTimeCheckbox.checked = hideLowTime;
+    }
+
+    // Now trigger processText to ensure UI reflects loaded state
+    if (savedSeconds === null) {
         processText();
     }
 });

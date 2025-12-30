@@ -34,6 +34,28 @@
                     </svg>
                     <h1>PCR補償刀時間軸轉換小工具</h1>
                 </div>
+                <button id="theme-toggle" class="theme-toggle" aria-label="切換主題">
+                    <!-- Moon Icon (for Light Mode) -->
+                    <svg class="icon theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <!-- Sun Icon (for Dark Mode) -->
+                    <svg class="icon theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
             </div>
         </header>
 
@@ -64,7 +86,7 @@
                         </div>
                         <div class="checkbox-wrapper">
                             <input type="checkbox" id="strict-mode">
-                            <label for="strict-mode">嚴格模式 (只匹配每行的第一組時間)</label>
+                            <label for="strict-mode">嚴格模式</label>
                             <div class="tooltip-container">
                                 <svg class="icon tooltip-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
                                     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -74,7 +96,7 @@
                                     <line x1="12" y1="8" x2="12.01" y2="8"></line>
                                 </svg>
                                 <div class="tooltip">
-                                    開啟後，每行只有發現的第一個時間數字會被調整，後續的數字將保持原樣。
+                                    開啟後，每行只有第一組時間數字會被調整，後續的數字將保持原樣。
                                 </div>
                             </div>
                         </div>
@@ -99,14 +121,7 @@
                         </div>
                     </div>
                     <div class="panel-body">
-                        <textarea id="input-text" placeholder="請在此貼上時間軸...">戰鬥開始Auto off（xoooo）
-
-　113 格蕾斯 → oooxo（軍病 on，格蕾斯 off）
-★ 102-101 格蕾斯（押1技「亡靈墜擊」buff，格蕾斯下墜後轉頭）
-　　 　→ ooooo（格蕾斯 on）
-　100 格蕾斯 → ooxox（貓賊、大冬 off），Auto on
-　054 貓賊（Auto）→ ooooo（貓賊、大冬 on）
-　046 格蕾斯 → oooxo（格蕾斯 off），Auto off</textarea>
+                        <textarea id="input-text" placeholder="請在此貼上時間軸..."></textarea>
                     </div>
                 </div>
 
