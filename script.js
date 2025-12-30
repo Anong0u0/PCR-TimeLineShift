@@ -28,14 +28,15 @@ document.addEventListener('DOMContentLoaded', () => {
         let shouldSkipFollowers = false;
 
         lines.forEach(line => {
+            if (/https?:\/\//.test(line)) return processedLines.push(line);
+            if (line.startsWith('//')) return processedLines.push(line);
+
             let matchCount = 0;
             let lineHasLowTime = false;
 
-            const lineRegex = /(?<!\d)([01]{0,2}?):?([0-5]?\d)(?!\d)/g;
+            const lineRegex = /(?<![,.\drRkK])(?:(0?[01]?):([0-5]\d)|(0?[01]??)([0-5]\d))(?![\dwW\-])/g;
 
             const processedLine = line.replace(lineRegex, (match, p1, p2) => {
-                if (match.length == 1 && match < 10 && match > 0) { return match; }
-
                 if (strictMode && matchCount > 0) {
                     return match;
                 }
