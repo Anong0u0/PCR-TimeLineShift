@@ -34,20 +34,23 @@ document.addEventListener('DOMContentLoaded', () => {
             let matchCount = 0;
             let lineHasLowTime = false;
 
-            const lineRegex = /(?<![,.\drRkK])(?:(0?[01]?):([0-5]\d)|(0?[01]??)([0-5]\d))(?![\dwW\-])/g;
+            const lineRegex = /(?<![,.\drRkK])(?:(0?[01]?):([0-5]\d)|(?<!:)(0?[01]??)([0-5]\d)(?!:))(?![\dwW\-])/g;
 
-            const processedLine = line.replace(lineRegex, (match, p1, p2) => {
+            const processedLine = line.replace(lineRegex, (match, p1, p2, p3, p4) => {
                 if (strictMode && matchCount > 0) {
                     return match;
                 }
 
                 let minutes = 0;
                 let seconds = 0;
+                const hasColon = match.includes(':');
+                const minutesPart = hasColon ? p1 : p3;
+                const secondsPart = hasColon ? p2 : p4;
 
-                if (p1 && p1.length > 0) {
-                    minutes = parseInt(p1, 10);
+                if (minutesPart && minutesPart.length > 0) {
+                    minutes = parseInt(minutesPart, 10);
                 }
-                seconds = parseInt(p2, 10);
+                seconds = parseInt(secondsPart, 10);
 
                 let totalSeconds = minutes * 60 + seconds;
                 let newTotalSeconds = totalSeconds + offset;
@@ -61,21 +64,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 let newMin = Math.floor(absSeconds / 60);
                 let newSec = absSeconds % 60;
-
-                let formattedMin = newMin.toString();
-                let formattedSec = newSec.toString().padStart(2, '0');
+                const minutesWidth = minutesPart ? minutesPart.length : 0;
+                const secondsWidth = secondsPart ? secondsPart.length : 0;
+                const sign = isNegative ? '-' : '';
 
                 matchCount++;
 
-                if (isNegative) {
-                    if (newMin > 0) {
-                        return `-${formattedMin}${formattedSec}`;
-                    } else {
-                        return `-${formattedSec}`;
-                    }
-                } else {
-                    return `${formattedMin}${formattedSec}`;
+                if (hasColon) {
+                    const minWidth = Math.max(1, minutesWidth);
+                    const formattedMin = newMin.toString().padStart(minWidth, '0');
+                    const formattedSec = newSec.toString().padStart(secondsWidth, '0');
+                    return `${sign}${formattedMin}:${formattedSec}`;
                 }
+
+                if (minutesWidth > 0) {
+                    const formattedMin = newMin.toString().padStart(minutesWidth, '0');
+                    const formattedSec = newSec.toString().padStart(secondsWidth, '0');
+                    return `${sign}${formattedMin}${formattedSec}`;
+                }
+
+                const formattedSec = newSec.toString().padStart(secondsWidth, '0');
+                return `${sign}${formattedSec}`;
             });
 
             if (matchCount > 0) {
