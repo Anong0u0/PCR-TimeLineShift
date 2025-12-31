@@ -63,8 +63,17 @@
         <main class="main-content container">
 
             <!-- Controls -->
-            <div class="controls-panel">
-                <div class="controls-wrapper">
+            <div class="controls-panel" id="controls-panel">
+                <div class="controls-header collapsible-header" id="controls-header-toggle" role="button" tabindex="0"
+                    aria-expanded="true" aria-controls="controls-wrapper" title="點擊以折疊/展開">
+                    <span class="controls-toggle-label">摺疊</span>
+                    <svg class="icon chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </div>
+                <div class="controls-wrapper" id="controls-wrapper">
                     <!-- Settings Input -->
                     <div class="control-group">
                         <label><b>剩餘秒數 (0-90):</b></label>
@@ -154,10 +163,10 @@
 
                 <!-- Input Panel -->
                 <div class="editor-panel white-panel" id="input-panel">
-                    <div class="panel-header collapsible-header" id="input-header-toggle" title="點擊以收縮/展開">
+                    <div class="panel-header collapsible-header" id="input-header-toggle" title="點擊以折疊/展開">
                         <span class="header-title">原始軸 (輸入)</span>
                         <div class="toggle-wrapper">
-                            <span class="toggle-label">收縮</span>
+                            <span class="toggle-label">折疊</span>
                             <svg class="icon chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
                                 viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round">

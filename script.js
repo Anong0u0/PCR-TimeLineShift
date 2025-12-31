@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ignoreCommentCheckbox = document.getElementById('ignore-comment');
     const highlightTimeCheckbox = document.getElementById('highlight-time');
     const copyBtn = document.getElementById('copy-btn');
+    const mainContent = document.querySelector('.main-content');
     const btnContentDefault = copyBtn.querySelector('.default-state');
     const btnContentCopied = copyBtn.querySelector('.copied-state');
 
@@ -238,15 +239,83 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputPanel = document.getElementById('input-panel');
     const inputHeaderToggle = document.getElementById('input-header-toggle');
     const toggleLabel = inputHeaderToggle.querySelector('.toggle-label');
+    const controlsPanel = document.getElementById('controls-panel');
+    const controlsHeaderToggle = document.getElementById('controls-header-toggle');
+    let updateControlsHeight = () => { };
+    let setControlsCollapsed = null;
 
     inputHeaderToggle.addEventListener('click', () => {
         inputPanel.classList.toggle('collapsed');
-        if (inputPanel.classList.contains('collapsed')) {
-            toggleLabel.textContent = "展開";
+        const inputCollapsed = inputPanel.classList.contains('collapsed');
+        if (inputCollapsed) {
+            toggleLabel.textContent = "展開原始軸";
         } else {
-            toggleLabel.textContent = "收縮";
+            toggleLabel.textContent = "摺疊";
+        }
+        if (mainContent) {
+            mainContent.classList.toggle('input-collapsed', inputCollapsed);
+            requestAnimationFrame(updateControlsHeight);
+        }
+        if (!inputCollapsed && setControlsCollapsed && window.matchMedia('(min-width: 1024px)').matches) {
+            setControlsCollapsed(false);
         }
     });
+
+    if (controlsPanel && controlsHeaderToggle && mainContent) {
+        const controlsToggleLabel = controlsHeaderToggle.querySelector('.controls-toggle-label');
+
+        updateControlsHeight = () => {
+            if (controlsPanel.classList.contains('collapsed')) {
+                return;
+            }
+            mainContent.style.setProperty('--controls-height', `${controlsPanel.offsetHeight}px`);
+        };
+
+        updateControlsHeight();
+
+        window.addEventListener('resize', () => {
+            updateControlsHeight();
+            if (window.matchMedia('(min-width: 1024px)').matches
+                && !inputPanel.classList.contains('collapsed')
+                && controlsPanel.classList.contains('collapsed')) {
+                setControlsCollapsed(false);
+            }
+        });
+
+        setControlsCollapsed = (shouldCollapse) => {
+            if (!shouldCollapse) {
+                controlsPanel.classList.remove('collapsed');
+                mainContent.classList.remove('controls-collapsed');
+                controlsHeaderToggle.setAttribute('aria-expanded', 'true');
+                if (controlsToggleLabel) {
+                    controlsToggleLabel.textContent = "摺疊";
+                }
+                requestAnimationFrame(updateControlsHeight);
+                return;
+            }
+
+            updateControlsHeight();
+            controlsPanel.classList.add('collapsed');
+            mainContent.classList.add('controls-collapsed');
+            controlsHeaderToggle.setAttribute('aria-expanded', 'false');
+            if (controlsToggleLabel) {
+                controlsToggleLabel.textContent = "展開設定";
+            }
+        };
+
+        const toggleControlsPanel = () => {
+            const isCollapsed = controlsPanel.classList.contains('collapsed');
+            setControlsCollapsed(!isCollapsed);
+        };
+
+        controlsHeaderToggle.addEventListener('click', toggleControlsPanel);
+        controlsHeaderToggle.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggleControlsPanel();
+            }
+        });
+    }
 
     copyBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(outputCode.textContent).then(() => {
