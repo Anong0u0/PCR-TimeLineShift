@@ -243,6 +243,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const controlsHeaderToggle = document.getElementById('controls-header-toggle');
     let updateControlsHeight = () => { };
     let setControlsCollapsed = null;
+    const appHeader = document.querySelector('.app-header');
+    let headerOverrideVisible = false;
+
+    const updateHeaderState = () => {
+        if (!appHeader) {
+            return;
+        }
+        const shouldCollapse = inputPanel?.classList.contains('collapsed')
+            && controlsPanel?.classList.contains('collapsed')
+            && !headerOverrideVisible;
+
+        document.body.classList.toggle('header-collapsed', shouldCollapse);
+    };
 
     inputHeaderToggle.addEventListener('click', () => {
         inputPanel.classList.toggle('collapsed');
@@ -259,6 +272,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!inputCollapsed && setControlsCollapsed && window.matchMedia('(min-width: 1024px)').matches) {
             setControlsCollapsed(false);
         }
+        headerOverrideVisible = false;
+        updateHeaderState();
     });
 
     if (controlsPanel && controlsHeaderToggle && mainContent) {
@@ -291,6 +306,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     controlsToggleLabel.textContent = "摺疊";
                 }
                 requestAnimationFrame(updateControlsHeight);
+                headerOverrideVisible = false;
+                updateHeaderState();
                 return;
             }
 
@@ -301,6 +318,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (controlsToggleLabel) {
                 controlsToggleLabel.textContent = "展開設定";
             }
+            headerOverrideVisible = false;
+            updateHeaderState();
         };
 
         const toggleControlsPanel = () => {
@@ -317,19 +336,69 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(outputCode.textContent).then(() => {
-            copyBtn.classList.add('copied');
-            btnContentDefault.style.display = 'none';
-            btnContentCopied.style.display = 'flex';
+    const showCopyState = () => {
+        copyBtn.classList.add('copied');
+        btnContentDefault.style.display = 'none';
+        btnContentCopied.style.display = 'flex';
 
-            setTimeout(() => {
-                copyBtn.classList.remove('copied');
-                btnContentDefault.style.display = 'flex';
-                btnContentCopied.style.display = 'none';
-            }, 2000);
-        });
+        setTimeout(() => {
+            copyBtn.classList.remove('copied');
+            btnContentDefault.style.display = 'flex';
+            btnContentCopied.style.display = 'none';
+        }, 2000);
+    };
+
+    const fallbackCopy = (text) => {
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        temp.setAttribute('readonly', '');
+        temp.style.position = 'absolute';
+        temp.style.left = '-9999px';
+        document.body.appendChild(temp);
+        temp.select();
+        try {
+            const ok = document.execCommand('copy');
+            if (ok) {
+                showCopyState();
+            }
+        } finally {
+            document.body.removeChild(temp);
+        }
+    };
+
+    copyBtn.addEventListener('click', () => {
+        const text = outputCode.textContent;
+        if (navigator?.clipboard?.writeText) {
+            navigator.clipboard.writeText(text)
+                .then(showCopyState)
+                .catch(() => fallbackCopy(text));
+            return;
+        }
+        fallbackCopy(text);
     });
+
+    const fullscreenToggleBtn = document.getElementById('fullscreen-toggle');
+    const updateFullscreenState = () => {
+        if (!fullscreenToggleBtn) {
+            return;
+        }
+        const isFullscreen = Boolean(document.fullscreenElement);
+        fullscreenToggleBtn.classList.toggle('is-fullscreen', isFullscreen);
+        fullscreenToggleBtn.setAttribute('aria-pressed', String(isFullscreen));
+        fullscreenToggleBtn.setAttribute('aria-label', isFullscreen ? '離開全螢幕' : '進入全螢幕');
+    };
+
+    if (fullscreenToggleBtn && document.fullscreenEnabled) {
+        fullscreenToggleBtn.addEventListener('click', () => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+                return;
+            }
+            document.documentElement.requestFullscreen().catch(() => { });
+        });
+        document.addEventListener('fullscreenchange', updateFullscreenState);
+        updateFullscreenState();
+    }
 
     const themeToggleBtn = document.getElementById('theme-toggle');
 
@@ -389,4 +458,107 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     processText();
+    updateHeaderState();
+
+    let lastTouchY = null;
+    const isInsideCode = (target) => target instanceof Element
+        && target.closest('.code-content, pre, code');
+    const shouldHandleTouch = (event) => event.touches.length === 1 && !isInsideCode(event.target);
+
+    window.addEventListener('touchstart', (event) => {
+        if (!shouldHandleTouch(event)) {
+            lastTouchY = null;
+            return;
+        }
+        lastTouchY = event.touches[0].clientY;
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (event) => {
+        if (!shouldHandleTouch(event) || lastTouchY === null) {
+            return;
+        }
+
+        const currentY = event.touches[0].clientY;
+        const deltaY = lastTouchY - currentY;
+        const threshold = 1;
+
+        if (deltaY > threshold) {
+            headerOverrideVisible = false;
+            updateHeaderState();
+        } else if (deltaY < -threshold) {
+            headerOverrideVisible = true;
+            updateHeaderState();
+        }
+
+        lastTouchY = currentY;
+    }, { passive: true });
+
+    window.addEventListener('touchend', () => {
+        lastTouchY = null;
+    }, { passive: true });
+
+    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        window.addEventListener('mousemove', (event) => {
+            const thresholdY = window.innerHeight * 0.04;
+            if (event.clientY <= thresholdY) {
+                if (!headerOverrideVisible) {
+                    headerOverrideVisible = true;
+                    updateHeaderState();
+                }
+                return;
+            }
+
+            if (headerOverrideVisible) {
+                headerOverrideVisible = false;
+                updateHeaderState();
+            }
+        });
+    }
+
+    const tooltipContainers = document.querySelectorAll('.tooltip-container');
+    tooltipContainers.forEach(container => {
+        const tooltip = container.querySelector('.tooltip');
+        if (!tooltip) return;
+
+        const wrapper = container.closest('.checkbox-wrapper');
+
+        const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+        const adjustPosition = () => {
+            const rect = tooltip.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            const wrapperRect = wrapper ? wrapper.getBoundingClientRect() : containerRect;
+            const viewportWidth = window.innerWidth;
+            const margin = 10;
+            const tooltipWidth = rect.width;
+            const viewportLeft = margin;
+            const viewportRight = viewportWidth - margin;
+            const maxLeft = viewportRight - tooltipWidth;
+
+            const baseLeft = containerRect.right - tooltipWidth;
+            const leftIdeal = wrapperRect.left;
+            const rightIdeal = wrapperRect.right - tooltipWidth;
+
+            const leftAligned = clamp(leftIdeal, viewportLeft, maxLeft);
+            const rightAligned = clamp(rightIdeal, viewportLeft, maxLeft);
+            const desiredLeft = (Math.abs(rightAligned - rightIdeal) <= Math.abs(leftAligned - leftIdeal))
+                ? rightAligned
+                : leftAligned;
+
+            const offsetX = desiredLeft - baseLeft;
+
+            const targetX = containerRect.left + (containerRect.width / 2);
+            const arrowRight = 8;
+            const safeMargin = 14;
+            const arrowTip = clamp(targetX, desiredLeft + safeMargin, desiredLeft + tooltipWidth - safeMargin);
+            const defaultArrowTip = desiredLeft + tooltipWidth - arrowRight;
+            const arrowOffsetX = arrowTip - defaultArrowTip;
+
+            tooltip.style.setProperty('--tooltip-offset-x', `${offsetX + 3}px`);
+            tooltip.style.setProperty('--tooltip-arrow-offset-x', `${arrowOffsetX + 3}px`);
+        };
+
+        container.addEventListener('mouseenter', adjustPosition);
+        container.addEventListener('mousemove', adjustPosition);
+    });
 });
