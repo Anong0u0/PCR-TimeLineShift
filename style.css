@@ -151,6 +151,9 @@ body.header-collapsed {
     z-index: 50;
     flex-shrink: 0;
     overflow: hidden;
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
     transition: height 0.3s, background-color 0.3s, border-color 0.3s;
 }
 
@@ -164,6 +167,9 @@ body.header-collapsed .app-header {
     align-items: center;
     justify-content: space-between;
     padding: 0 1.5rem;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 .header-title-group {
