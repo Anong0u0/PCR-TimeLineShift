@@ -74,8 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const fileFromFiles = getFirstImageFile(clipboardData.files);
         return fileFromFiles || null;
     };
-    const isInputTextPasteContext = (event) =>
-        event.target === inputText || document.activeElement === inputText;
     const dragHasFiles = (event) => Array.from(event?.dataTransfer?.types || []).includes('Files');
     const setDropOverlayVisible = (visible) => {
         if (ocrDropOverlay) {
@@ -315,9 +313,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.addEventListener('paste', (event) => {
-        if (!isInputTextPasteContext(event)) {
-            return;
-        }
         const imageFile = getClipboardImageFile(event.clipboardData);
         if (!imageFile) {
             return;
