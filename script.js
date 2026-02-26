@@ -65,6 +65,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const getErrorMessage = (error) => error?.message || String(error);
     const setOcrError = (prefix, error) => setOcrStatus(`${prefix}: ${getErrorMessage(error)}`, 'is-error');
     const toPercentText = (value) => `${Math.max(0, Math.min(100, Math.round(Number(value) || 0)))}%`;
+    const resolveOcrProgressStatus = (progress) => {
+        const failText = `OCR 初始化失敗: ${progress.message || 'unknown error'}`;
+        const unified = progress.progress;
+        if (unified) {
+            if (unified.state === 'failed' || progress.state === 'failed' || progress.phase === 'error') {
+                return ['OCR 失敗: ' + (progress.message || 'unknown error'), 'is-error'];
+            }
+            if (unified.kind === 'recognize') {
+                return unified.state === 'done'
+                    ? ['OCR 辨識完成', 'is-ready']
+                    : [`OCR 辨識中 ${toPercentText(unified.percent)}`, 'is-loading'];
+            }
+            if (unified.kind === 'init') {
+                return (unified.percent >= 100 || (progress.phase === 'ready' && progress.state === 'done'))
+                    ? ['OCR 已就緒', 'is-ready']
+                    : [`OCR 初始化中 ${toPercentText(unified.percent)}`, 'is-loading'];
+            }
+        }
+        if (progress.phase === 'download' && progress.download?.overall) {
+            return [`OCR 初始化中 ${toPercentText(progress.download.overall.percent)}`, 'is-loading'];
+        }
+        if (progress.phase === 'warmup' && progress.warmup?.total) {
+            return [`OCR 暖機 ${progress.warmup.current}/${progress.warmup.total}`, 'is-loading'];
+        }
+        if (progress.phase === 'ready' && progress.state === 'done') {
+            return ['OCR 已就緒', 'is-ready'];
+        }
+        if (progress.phase === 'error' || progress.state === 'failed') {
+            return [failText, 'is-error'];
+        }
+        if (progress.state === 'loading' || progress.state === 'creating' || progress.state === 'running') {
+            return ['OCR 初始化中...', 'is-loading'];
+        }
+        return null;
+    };
     const isImageFile = (file) => Boolean(file?.type?.startsWith('image/'));
     const getFirstImageFile = (files) => Array.from(files || []).find(isImageFile) || null;
     const getClipboardImageFile = (clipboardData) => {
@@ -86,28 +121,14 @@ document.addEventListener('DOMContentLoaded', () => {
         processText();
     };
 
-    const renderOcrInitProgress = (progress) => {
-        if (!progress || ocrRecognizing) {
+    const renderOcrProgress = (progress) => {
+        if (!progress) {
             return;
         }
-        if (progress.phase === 'download' && progress.download?.overall) {
-            setOcrStatus(`OCR 初始化中 ${toPercentText(progress.download.overall.percent)}`, 'is-loading');
-            return;
-        }
-        if (progress.phase === 'warmup' && progress.warmup?.total) {
-            setOcrStatus(`OCR 暖機 ${progress.warmup.current}/${progress.warmup.total}`, 'is-loading');
-            return;
-        }
-        if (progress.phase === 'ready' && progress.state === 'done') {
-            setOcrStatus('OCR 已就緒', 'is-ready');
-            return;
-        }
-        if (progress.phase === 'error' || progress.state === 'failed') {
-            setOcrStatus(`OCR 初始化失敗: ${progress.message || 'unknown error'}`, 'is-error');
-            return;
-        }
-        if (progress.state === 'loading' || progress.state === 'creating' || progress.state === 'running') {
-            setOcrStatus('OCR 初始化中...', 'is-loading');
+
+        const nextStatus = resolveOcrProgressStatus(progress);
+        if (nextStatus) {
+            setOcrStatus(nextStatus[0], nextStatus[1]);
         }
     };
     const startOcrInitInBackground = () => {
@@ -116,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return null;
         }
         if (!ocrInitProgressUnsub) {
-            ocrInitProgressUnsub = window.PPOCRv5.onInitProgress(renderOcrInitProgress);
+            ocrInitProgressUnsub = window.PPOCRv5.onInitProgress(renderOcrProgress);
         }
         if (ocrEngine) {
             setIdleOcrStatus('OCR 已就緒', 'is-ready');

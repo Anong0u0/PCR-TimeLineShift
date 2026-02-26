@@ -9,12 +9,7 @@
   const SINGLETON_KEY = "__ppocrv5_singleton__";
 
   function logError(tag, err) {
-    try {
-      // eslint-disable-next-line no-console
-      alert("[PPOCRv5] " + tag, err && err.message ? err.message : err);
-    } catch (_) {
-      // ignore
-    }
+    console.error(`[PPOCRv5] ${tag}:`, err);
   }
 
   function scriptBaseUrl() {
@@ -39,6 +34,122 @@
   function finiteNumber(v, fallback) {
     const x = Number(v);
     return Number.isFinite(x) ? x : fallback;
+  }
+
+  function errorMessage(err) {
+    return err && err.message ? err.message : String(err);
+  }
+
+  const RECOGNIZE_OVERALL = {
+    start: 0,
+    prep: 10,
+    det: 35,
+    rec: 95,
+    done: 100,
+  };
+  const INIT_PROGRESS_POINTS = Object.freeze({
+    "init:start": 0,
+    "deps:loading": 5,
+    "deps:done": 15,
+    "dict:loading": 18,
+    "dict:done": 25,
+    "download:done": 75,
+    "service:creating": 80,
+    "service:done": 88,
+    "warmup:done": 99,
+    "ready:done": 100,
+  });
+
+  function noop() { }
+
+  function createRecognizeEmitter(engine, enabled) {
+    return enabled ? engine._emitRecognize.bind(engine) : noop;
+  }
+
+  function buildRecDetail(current, total) {
+    const ratio = total > 0 ? (current / total) : 1;
+    return {
+      current: current,
+      total: total,
+      percent: ratio * 100,
+      overallPercent: total > 0 ? (RECOGNIZE_OVERALL.det + ratio * (RECOGNIZE_OVERALL.rec - RECOGNIZE_OVERALL.det)) : RECOGNIZE_OVERALL.rec,
+    };
+  }
+
+  function stageDetail(percent, overallPercent, extra) {
+    return Object.assign({ percent: percent, overallPercent: overallPercent }, extra || {});
+  }
+
+  function emitProgressEvent(emit, state, stage, detail, err) {
+    if (err !== undefined) {
+      emit(state, stage, detail, err);
+      return;
+    }
+    emit(state, stage, detail);
+  }
+
+  function clampPercent(v, fallback) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return fallback;
+    if (n < 0) return 0;
+    if (n > 100) return 100;
+    return n;
+  }
+
+  function mapRange(percent, fromStart, fromEnd) {
+    const p = clampPercent(percent, 0) / 100;
+    return fromStart + (fromEnd - fromStart) * p;
+  }
+
+  function deriveUnifiedProgress(payload, prev) {
+    const phase = payload && payload.phase ? payload.phase : "";
+    const state = payload && payload.state ? payload.state : "";
+    const last = prev || null;
+
+    if (phase === "recognize") {
+      const rec = payload && payload.recognize ? payload.recognize : {};
+      let percent = clampPercent(rec.overallPercent, NaN);
+      if (!Number.isFinite(percent)) {
+        percent = state === "done" ? 100 : (last && Number.isFinite(last.percent) ? last.percent : 0);
+      }
+      return {
+        kind: "recognize",
+        stage: rec.stage || "recognize",
+        state: state || "running",
+        percent: percent,
+      };
+    }
+
+    const lastPercent = last && Number.isFinite(last.percent) ? last.percent : 0;
+    if (phase === "error" && state === "failed") {
+      return {
+        kind: (last && last.kind) ? last.kind : "init",
+        stage: (last && last.stage) ? last.stage : "error",
+        state: "failed",
+        percent: clampPercent(lastPercent, 0),
+      };
+    }
+
+    let percent = lastPercent;
+    if (phase === "download" && state === "running") {
+      const raw = payload && payload.download && payload.download.overall ? payload.download.overall.percent : 0;
+      percent = mapRange(raw, 25, 75);
+    } else if (phase === "warmup" && state === "running") {
+      const raw = payload && payload.warmup ? payload.warmup.percent : 0;
+      percent = mapRange(raw, 88, 99);
+    } else {
+      const key = phase + ":" + state;
+      if (Object.prototype.hasOwnProperty.call(INIT_PROGRESS_POINTS, key)) {
+        percent = INIT_PROGRESS_POINTS[key];
+      }
+    }
+
+    return {
+      kind: "init",
+      stage: phase || "init",
+      state: state || "running",
+      percent: clampPercent(percent, 0),
+    };
   }
 
   function mergeOptions(base, override) {
@@ -149,10 +260,10 @@
     if (cache[key]) return await cache[key];
 
     cache[key] = (async function () {
-      const persist = !(options && options.persistDictInIndexedDB === false);
-      const loc = getIdbLocation(options);
-      const dbName = loc.dbName;
-      const storeName = loc.storeName;
+      const settings = getPersistenceSettings(options, "persistDictInIndexedDB");
+      const persist = settings.persist;
+      const dbName = settings.dbName;
+      const storeName = settings.storeName;
 
       if (persist && global.indexedDB) {
         const cachedText = await idbGetText(dbName, storeName, key);
@@ -224,11 +335,20 @@
     };
   }
 
-  async function fetchModelArrayBuffer(url, onProgress, options) {
-    const persist = !(options && options.persistModelsInIndexedDB === false);
+  function getPersistenceSettings(options, disableFlagName) {
     const loc = getIdbLocation(options);
-    const dbName = loc.dbName;
-    const storeName = loc.storeName;
+    return {
+      persist: !(options && options[disableFlagName] === false),
+      dbName: loc.dbName,
+      storeName: loc.storeName,
+    };
+  }
+
+  async function fetchModelArrayBuffer(url, onProgress, options) {
+    const settings = getPersistenceSettings(options, "persistModelsInIndexedDB");
+    const persist = settings.persist;
+    const dbName = settings.dbName;
+    const storeName = settings.storeName;
     const cacheKey = VERSION + "::" + url;
 
     if (persist && global.indexedDB) {
@@ -311,6 +431,7 @@
     warmupTimes: 2,
     warmupImageWidth: 256,
     warmupImageHeight: 96,
+    reportRecognitionProgress: true,
     onProgress: null,
   };
 
@@ -334,7 +455,9 @@
   };
 
   Engine.prototype._emitProgress = function (payload) {
+    const prev = this._lastProgress && this._lastProgress.progress ? this._lastProgress.progress : null;
     const data = Object.assign({}, payload || {}, { ts: Date.now() });
+    data.progress = deriveUnifiedProgress(data, prev);
     this._lastProgress = data;
 
     const listeners = this._progressListeners;
@@ -344,6 +467,16 @@
     if (typeof this.options.onProgress === "function") {
       try { this.options.onProgress(data); } catch (_) { /* ignore callback error */ }
     }
+  };
+
+  Engine.prototype._emitRecognize = function (state, stage, detail, err) {
+    const payload = {
+      phase: "recognize",
+      state: state,
+      recognize: Object.assign({ stage: stage }, detail || {}),
+    };
+    if (err !== undefined) payload.message = errorMessage(err);
+    this._emitProgress(payload);
   };
 
   Engine.prototype.getInitProgress = function () {
@@ -539,6 +672,7 @@
     const detSvc = ocr && ocr.detectionService;
     const recSvc = ocr && ocr.recognitionService;
     if (!detSvc || !recSvc) throw new Error("Invalid OCR service");
+    const enableRecognizeProgress = runOptions.reportRecognitionProgress !== false;
 
     const detOpt = detSvc.options || (detSvc.options = {});
     const recOpt = recSvc.options || (recSvc.options = {});
@@ -564,22 +698,80 @@
       imageHeight: clampInt(runOptions.recognitionImageHeight, 16, 128, 48),
     });
 
+    const detRunRaw = detSvc.run;
     const recRunRaw = recSvc.run;
+    const recProcessBoxRaw = recSvc.processBox;
     const engine = this;
+    const emit = createRecognizeEmitter(engine, enableRecognizeProgress);
+    let filteredFromDet = null;
+    let detectionFromDet = null;
+
+    detSvc.run = async function (image) {
+      emitProgressEvent(emit, "running", "det", stageDetail(0, RECOGNIZE_OVERALL.prep));
+      try {
+        const detection = await detRunRaw.call(detSvc, image);
+        const filtered = engine._filterDetections(detection, runOptions);
+        detectionFromDet = detection;
+        filteredFromDet = filtered;
+        emitProgressEvent(emit, "running", "det", stageDetail(100, RECOGNIZE_OVERALL.det, {
+          detectedBoxes: Array.isArray(detection) ? detection.length : 0,
+          boxes: Array.isArray(filtered) ? filtered.length : 0,
+        }));
+        return detection;
+      } catch (e) {
+        emitProgressEvent(emit, "failed", "det", stageDetail(100, RECOGNIZE_OVERALL.det), e);
+        throw e;
+      }
+    };
+
     recSvc.run = async function (image, detection, options) {
-      const filtered = engine._filterDetections(detection, runOptions);
-      return await recRunRaw.call(recSvc, image, filtered, options);
+      const filtered = (detection === detectionFromDet && Array.isArray(filteredFromDet))
+        ? filteredFromDet
+        : engine._filterDetections(detection, runOptions);
+      detectionFromDet = null;
+      filteredFromDet = null;
+      const total = Array.isArray(filtered) ? filtered.length : 0;
+      let completed = 0;
+      emitProgressEvent(emit, "running", "rec", Object.assign(buildRecDetail(0, total), { overallPercent: RECOGNIZE_OVERALL.det }));
+
+      const canTrackPerBox = enableRecognizeProgress && typeof recProcessBoxRaw === "function" && total > 0;
+      try {
+        if (canTrackPerBox) {
+          recSvc.processBox = async function (task) {
+            const result = await recProcessBoxRaw.call(recSvc, task);
+            completed += 1;
+            emitProgressEvent(emit, "running", "rec", buildRecDetail(completed, total));
+            return result;
+          };
+        }
+        const out = await recRunRaw.call(recSvc, image, filtered, options);
+        emitProgressEvent(emit, "running", "rec", buildRecDetail(total, total));
+        return out;
+      } catch (e) {
+        emitProgressEvent(emit, "failed", "rec", buildRecDetail(completed, total), e);
+        throw e;
+      } finally {
+        if (canTrackPerBox) recSvc.processBox = recProcessBoxRaw;
+      }
     };
 
     try {
       const recResults = await ocr.recognize(input);
-      const final = ocr.processRecognition(recResults);
-      return {
-        text: final && final.text ? final.text : "",
-        confidence: final && Number.isFinite(final.confidence) ? final.confidence : 0,
-        lines: final && Array.isArray(final.lines) ? final.lines : [],
-      };
+      try {
+        emitProgressEvent(emit, "running", "post", stageDetail(0, RECOGNIZE_OVERALL.rec));
+        const final = ocr.processRecognition(recResults);
+        emitProgressEvent(emit, "running", "post", stageDetail(100, RECOGNIZE_OVERALL.done));
+        return {
+          text: final && final.text ? final.text : "",
+          confidence: final && Number.isFinite(final.confidence) ? final.confidence : 0,
+          lines: final && Array.isArray(final.lines) ? final.lines : [],
+        };
+      } catch (e) {
+        emitProgressEvent(emit, "failed", "post", stageDetail(100, RECOGNIZE_OVERALL.done), e);
+        throw e;
+      }
     } finally {
+      detSvc.run = detRunRaw;
       recSvc.run = recRunRaw;
       restoreDet();
       restoreRec();
@@ -596,6 +788,12 @@
     }
   };
 
+  Engine.prototype._withReadyLock = async function (overrideOptions, fn) {
+    this._ensureNotDestroyed();
+    await this.init(overrideOptions);
+    return await this._withLock(fn);
+  };
+
   Engine.prototype._warmupOnce = async function (runOptions) {
     const w = clampInt(runOptions.warmupImageWidth, 32, 1024, 256);
     const h = clampInt(runOptions.warmupImageHeight, 32, 1024, 96);
@@ -604,7 +802,8 @@
       height: h,
       data: new Uint8Array(w * h * 4).fill(255),
     };
-    await this._recognizeInput(dummy, runOptions);
+    const warmupOptions = mergeOptions(runOptions, { reportRecognitionProgress: false });
+    await this._recognizeInput(dummy, warmupOptions);
   };
 
   Engine.prototype.init = async function (overrideOptions) {
@@ -680,7 +879,7 @@
       return await this._initPromise;
     } catch (e) {
       logError("init failed", e);
-      this._emitProgress({ phase: "error", state: "failed", message: e && e.message ? e.message : String(e) });
+      this._emitProgress({ phase: "error", state: "failed", message: errorMessage(e) });
       throw e;
     } finally {
       this._initPromise = null;
@@ -689,20 +888,31 @@
 
   Engine.prototype._recognizeBitmap = async function (bitmap, overrideOptions) {
     const runOptions = overrideOptions ? mergeOptions(this.options, overrideOptions) : this.options;
-    const input = this._bitmapToInput(bitmap, runOptions.inputMaxSide);
-    return await this._recognizeInput(input, runOptions);
+    const enableRecognizeProgress = runOptions.reportRecognitionProgress !== false;
+    const emit = createRecognizeEmitter(this, enableRecognizeProgress);
+    emitProgressEvent(emit, "running", "start", stageDetail(0, RECOGNIZE_OVERALL.start));
+    emitProgressEvent(emit, "running", "prep", stageDetail(0, RECOGNIZE_OVERALL.start));
+
+    let input = null;
+    try {
+      input = this._bitmapToInput(bitmap, runOptions.inputMaxSide);
+    } catch (e) {
+      emitProgressEvent(emit, "failed", "prep", stageDetail(100, RECOGNIZE_OVERALL.prep), e);
+      throw e;
+    }
+
+    emitProgressEvent(emit, "running", "prep", stageDetail(100, RECOGNIZE_OVERALL.prep));
+    const result = await this._recognizeInput(input, runOptions);
+    emitProgressEvent(emit, "done", "done", stageDetail(100, RECOGNIZE_OVERALL.done));
+    return result;
   };
 
   Engine.prototype.recognizeFile = async function (file, overrideOptions) {
-    this._ensureNotDestroyed();
-    await this.init(overrideOptions);
-
-    const self = this;
-    return await this._withLock(async function () {
+    return await this._withReadyLock(overrideOptions, async () => {
       let bitmap = null;
       try {
         bitmap = await createImageBitmap(file);
-        return await self._recognizeBitmap(bitmap, overrideOptions);
+        return this._recognizeBitmap(bitmap, overrideOptions);
       } finally {
         if (bitmap && typeof bitmap.close === "function") bitmap.close();
       }
@@ -714,12 +924,7 @@
   };
 
   Engine.prototype.recognizeImageBitmap = async function (bitmap, overrideOptions) {
-    this._ensureNotDestroyed();
-    await this.init(overrideOptions);
-    const self = this;
-    return await this._withLock(async function () {
-      return await self._recognizeBitmap(bitmap, overrideOptions);
-    });
+    return await this._withReadyLock(overrideOptions, async () => this._recognizeBitmap(bitmap, overrideOptions));
   };
 
   Engine.prototype.destroy = async function () {
@@ -737,14 +942,23 @@
     this._configKey = null;
   };
 
-  async function init(options) {
-    if (!global[SINGLETON_KEY]) {
-      global[SINGLETON_KEY] = new Engine(options);
-    } else if (options) {
-      global[SINGLETON_KEY].options = mergeOptions(global[SINGLETON_KEY].options, options);
+  function getSingletonEngine(createIfMissing, options) {
+    let engine = global[SINGLETON_KEY] || null;
+    if (!engine && createIfMissing) {
+      engine = new Engine(options || null);
+      global[SINGLETON_KEY] = engine;
+      return engine;
     }
-    await global[SINGLETON_KEY].init();
-    return global[SINGLETON_KEY];
+    if (engine && options) {
+      engine.options = mergeOptions(engine.options, options);
+    }
+    return engine;
+  }
+
+  async function init(options) {
+    const engine = getSingletonEngine(true, options);
+    await engine.init();
+    return engine;
   }
 
   const api = {
@@ -753,12 +967,11 @@
     create: function (options) { return new Engine(options); },
     init: init,
     onInitProgress: function (fn) {
-      if (!global[SINGLETON_KEY]) global[SINGLETON_KEY] = new Engine(null);
-      return global[SINGLETON_KEY].onInitProgress(fn);
+      return getSingletonEngine(true, null).onInitProgress(fn);
     },
     getInitProgress: function () {
-      if (!global[SINGLETON_KEY]) return null;
-      return global[SINGLETON_KEY].getInitProgress();
+      const engine = getSingletonEngine(false, null);
+      return engine ? engine.getInitProgress() : null;
     },
     getSingleton: function () { return global[SINGLETON_KEY] || null; },
     Engine: Engine,
