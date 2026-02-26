@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let ocrEngine = null;
     let ocrInitPromise = null;
     let ocrInitProgressUnsub = null;
+    let ocrProcessing = false;
     let ocrRecognizing = false;
     let dragDepth = 0;
     const highlightMarker = '󠉑'; // \ue0251
@@ -66,6 +67,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const toPercentText = (value) => `${Math.max(0, Math.min(100, Math.round(Number(value) || 0)))}%`;
     const isImageFile = (file) => Boolean(file?.type?.startsWith('image/'));
     const getFirstImageFile = (files) => Array.from(files || []).find(isImageFile) || null;
+    const getClipboardImageFile = (clipboardData) => {
+        if (!clipboardData) {
+            return null;
+        }
+        const fileFromFiles = getFirstImageFile(clipboardData.files);
+        return fileFromFiles || null;
+    };
+    const isInputTextPasteContext = (event) =>
+        event.target === inputText || document.activeElement === inputText;
     const dragHasFiles = (event) => Array.from(event?.dataTransfer?.types || []).includes('Files');
     const setDropOverlayVisible = (visible) => {
         if (ocrDropOverlay) {
@@ -143,21 +153,23 @@ document.addEventListener('DOMContentLoaded', () => {
             setOcrStatus('請選擇圖片檔', 'is-error');
             return;
         }
-        if (ocrRecognizing) {
+        if (ocrProcessing) {
             setOcrStatus('OCR 辨識中，請稍候', 'is-loading');
             return;
         }
-        ocrRecognizing = true;
+        ocrProcessing = true;
         try {
-            setOcrStatus('OCR 辨識中...', 'is-loading');
             const engine = await ensureOcrEngine();
+            ocrRecognizing = true;
+            setOcrStatus('OCR 辨識中...', 'is-loading');
             const result = await engine.recognizeFile(file);
             applyOcrText(result?.text || '');
             setOcrStatus('OCR 辨識完成', 'is-ready');
         } catch (error) {
-            setOcrError('OCR 辨識失敗', error);
+            setOcrError(ocrRecognizing ? 'OCR 辨識失敗' : 'OCR 初始化失敗', error);
         } finally {
             ocrRecognizing = false;
+            ocrProcessing = false;
         }
     };
 
@@ -301,6 +313,19 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('pcr_timeline_input', inputText.value);
         processText();
     });
+
+    document.addEventListener('paste', (event) => {
+        if (!isInputTextPasteContext(event)) {
+            return;
+        }
+        const imageFile = getClipboardImageFile(event.clipboardData);
+        if (!imageFile) {
+            return;
+        }
+        event.preventDefault();
+        startOcrInitInBackground();
+        runOcrFromFile(imageFile);
+    }, true);
 
     if (ocrUploadBtn && ocrFileInput) {
         ocrUploadBtn.addEventListener('pointerdown', (event) => {
