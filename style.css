@@ -881,6 +881,50 @@ code {
    7. UTILS & BUTTONS
    ========================================= */
 
+.panel-header .header-title {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.ocr-upload-btn {
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: #86aaff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    padding: 0.2rem 0.4rem;
+    margin: auto 0.25rem;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+[data-theme="dark"] .ocr-upload-btn {
+    border-color: #1e3a8a;
+    background: #172554;
+    color: #bfdbfe;
+}
+
+.ocr-status {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-left: 0.5rem;
+}
+
+.ocr-status.is-loading {
+    color: var(--color-primary-500);
+}
+
+.ocr-status.is-ready {
+    color: var(--color-success);
+}
+
+.ocr-status.is-error {
+    color: var(--color-danger);
+}
+
 .copy-btn {
     border: 1px solid var(--border-color);
     background: rgba(255, 255, 255, 0.05);
@@ -984,6 +1028,18 @@ code {
 }
 
 @media (hover: hover) and (pointer: fine) {
+    .ocr-upload-btn:hover {
+        background-color: #dbeafe;
+        border-color: #93c5fd;
+        color: #60a5fa;
+    }
+
+    [data-theme="dark"] .ocr-upload-btn:hover {
+        background-color: #1e40af;
+        border-color: #1d4ed8;
+        color: #dbeafe;
+    }
+
     .controls-panel:hover {
         box-shadow: var(--shadow-md);
     }
@@ -1068,6 +1124,18 @@ code {
 }
 
 @media (hover: none) and (pointer: coarse) {
+    .ocr-upload-btn:active {
+        background-color: #bfdbfe;
+        border-color: #60a5fa;
+        color: #3b82f6;
+    }
+
+    [data-theme="dark"] .ocr-upload-btn:active {
+        background-color: #1e293b;
+        border-color: #1e3a8a;
+        color: #bfdbfe;
+    }
+
     .controls-panel:active {
         box-shadow: var(--shadow-md);
     }
@@ -1226,6 +1294,7 @@ code {
 textarea {
     color: var(--text-main);
     line-height: 1.6;
+    padding: 1em;
 }
 
 textarea:focus {
@@ -1262,4 +1331,43 @@ textarea:focus {
 #output-code {
     font-family: var(--font-mono);
     line-height: 1.6;
+}
+
+.ocr-drop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.48);
+    backdrop-filter: blur(2px);
+    pointer-events: none;
+}
+
+.ocr-drop-overlay.visible {
+    display: flex;
+}
+
+.ocr-drop-overlay-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 1rem 1.4rem;
+    border-radius: var(--radius-lg);
+    border: 1px dashed rgba(255, 255, 255, 0.8);
+    background: rgba(15, 23, 42, 0.75);
+    color: #f8fafc;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+}
+
+.ocr-drop-overlay-content strong {
+    font-size: 1rem;
+}
+
+.ocr-drop-overlay-content span {
+    font-size: 0.8rem;
+    color: rgba(248, 250, 252, 0.88);
 }

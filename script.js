@@ -13,12 +13,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.querySelector('.main-content');
     const btnContentDefault = copyBtn.querySelector('.default-state');
     const btnContentCopied = copyBtn.querySelector('.copied-state');
+    const ocrUploadBtn = document.getElementById('ocr-upload-btn');
+    const ocrFileInput = document.getElementById('ocr-file-input');
+    const ocrStatus = document.getElementById('ocr-status');
+    const ocrDropOverlay = document.getElementById('ocr-drop-overlay');
 
     let remainingSeconds = 90;
     let strictMode = false;
     let hideLowTime = true;
     let matchCommentTime = false;
     let highlightTime = false;
+    let ocrEngine = null;
+    let ocrInitPromise = null;
+    let ocrInitProgressUnsub = null;
+    let ocrRecognizing = false;
+    let dragDepth = 0;
     const highlightMarker = '󠉑'; // \ue0251
 
     const toHalfwidthDigits = (value) => value.replace(/[０-９]/g, (digit) =>
@@ -36,6 +45,121 @@ document.addEventListener('DOMContentLoaded', () => {
     const wrapHighlightMarker = (value) => highlightTime
         ? `${highlightMarker}${value}${highlightMarker}`
         : value;
+    const ocrStatusModes = ['is-loading', 'is-ready', 'is-error'];
+    const setOcrStatus = (message = '', mode = '') => {
+        if (!ocrStatus) {
+            return;
+        }
+        ocrStatus.textContent = message;
+        ocrStatus.classList.remove(...ocrStatusModes);
+        if (mode) {
+            ocrStatus.classList.add(mode);
+        }
+    };
+    const setIdleOcrStatus = (message, mode) => {
+        if (!ocrRecognizing) {
+            setOcrStatus(message, mode);
+        }
+    };
+    const getErrorMessage = (error) => error?.message || String(error);
+    const setOcrError = (prefix, error) => setOcrStatus(`${prefix}: ${getErrorMessage(error)}`, 'is-error');
+    const toPercentText = (value) => `${Math.max(0, Math.min(100, Math.round(Number(value) || 0)))}%`;
+    const isImageFile = (file) => Boolean(file?.type?.startsWith('image/'));
+    const getFirstImageFile = (files) => Array.from(files || []).find(isImageFile) || null;
+    const dragHasFiles = (event) => Array.from(event?.dataTransfer?.types || []).includes('Files');
+    const setDropOverlayVisible = (visible) => {
+        if (ocrDropOverlay) {
+            ocrDropOverlay.classList.toggle('visible', visible);
+        }
+    };
+    const applyOcrText = (text = '') => {
+        inputText.value = text;
+        localStorage.setItem('pcr_timeline_input', text);
+        processText();
+    };
+
+    const renderOcrInitProgress = (progress) => {
+        if (!progress || ocrRecognizing) {
+            return;
+        }
+        if (progress.phase === 'download' && progress.download?.overall) {
+            setOcrStatus(`OCR 初始化中 ${toPercentText(progress.download.overall.percent)}`, 'is-loading');
+            return;
+        }
+        if (progress.phase === 'warmup' && progress.warmup?.total) {
+            setOcrStatus(`OCR 暖機 ${progress.warmup.current}/${progress.warmup.total}`, 'is-loading');
+            return;
+        }
+        if (progress.phase === 'ready' && progress.state === 'done') {
+            setOcrStatus('OCR 已就緒', 'is-ready');
+            return;
+        }
+        if (progress.phase === 'error' || progress.state === 'failed') {
+            setOcrStatus(`OCR 初始化失敗: ${progress.message || 'unknown error'}`, 'is-error');
+            return;
+        }
+        if (progress.state === 'loading' || progress.state === 'creating' || progress.state === 'running') {
+            setOcrStatus('OCR 初始化中...', 'is-loading');
+        }
+    };
+    const startOcrInitInBackground = () => {
+        if (!window.PPOCRv5) {
+            setOcrStatus('OCR plugin 未載入', 'is-error');
+            return null;
+        }
+        if (!ocrInitProgressUnsub) {
+            ocrInitProgressUnsub = window.PPOCRv5.onInitProgress(renderOcrInitProgress);
+        }
+        if (ocrEngine) {
+            setIdleOcrStatus('OCR 已就緒', 'is-ready');
+            return Promise.resolve(ocrEngine);
+        }
+        if (!ocrInitPromise) {
+            setIdleOcrStatus('OCR 初始化中...', 'is-loading');
+            ocrInitPromise = window.PPOCRv5.init()
+                .then((engine) => {
+                    ocrEngine = engine;
+                    setIdleOcrStatus('OCR 已就緒', 'is-ready');
+                    return engine;
+                })
+                .catch((error) => {
+                    ocrInitPromise = null;
+                    ocrEngine = null;
+                    setOcrError('OCR 初始化失敗', error);
+                    throw error;
+                });
+        }
+        return ocrInitPromise;
+    };
+    const ensureOcrEngine = async () => {
+        const initPromise = startOcrInitInBackground();
+        if (!initPromise) {
+            throw new Error('PPOCRv5 plugin not loaded');
+        }
+        return await initPromise;
+    };
+    const runOcrFromFile = async (file) => {
+        if (!isImageFile(file)) {
+            setOcrStatus('請選擇圖片檔', 'is-error');
+            return;
+        }
+        if (ocrRecognizing) {
+            setOcrStatus('OCR 辨識中，請稍候', 'is-loading');
+            return;
+        }
+        ocrRecognizing = true;
+        try {
+            setOcrStatus('OCR 辨識中...', 'is-loading');
+            const engine = await ensureOcrEngine();
+            const result = await engine.recognizeFile(file);
+            applyOcrText(result?.text || '');
+            setOcrStatus('OCR 辨識完成', 'is-ready');
+        } catch (error) {
+            setOcrError('OCR 辨識失敗', error);
+        } finally {
+            ocrRecognizing = false;
+        }
+    };
 
     const processText = () => {
         const text = inputText.value;
@@ -178,6 +302,85 @@ document.addEventListener('DOMContentLoaded', () => {
         processText();
     });
 
+    if (ocrUploadBtn && ocrFileInput) {
+        ocrUploadBtn.addEventListener('pointerdown', (event) => {
+            event.stopPropagation();
+        });
+
+        ocrUploadBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            startOcrInitInBackground();
+            ocrFileInput.value = '';
+            ocrFileInput.click();
+        });
+
+        ocrFileInput.addEventListener('change', (event) => {
+            const [file] = event.target.files || [];
+            if (file) {
+                runOcrFromFile(file);
+            }
+            event.target.value = '';
+        });
+    }
+
+    const prepareForDrop = (event) => {
+        if (!dragHasFiles(event)) {
+            return false;
+        }
+        event.preventDefault();
+        startOcrInitInBackground();
+        return true;
+    };
+
+    window.addEventListener('dragenter', (event) => {
+        if (!prepareForDrop(event)) {
+            return;
+        }
+        dragDepth += 1;
+        setDropOverlayVisible(true);
+    });
+
+    window.addEventListener('dragover', (event) => {
+        if (!prepareForDrop(event)) {
+            return;
+        }
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = 'copy';
+        }
+        setDropOverlayVisible(true);
+    });
+
+    window.addEventListener('dragleave', (event) => {
+        if (dragDepth === 0 && !ocrDropOverlay?.classList.contains('visible')) {
+            return;
+        }
+        event.preventDefault();
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) {
+            setDropOverlayVisible(false);
+        }
+    });
+
+    window.addEventListener('dragend', () => {
+        dragDepth = 0;
+        setDropOverlayVisible(false);
+    });
+
+    window.addEventListener('drop', (event) => {
+        if (!prepareForDrop(event)) {
+            return;
+        }
+        dragDepth = 0;
+        setDropOverlayVisible(false);
+        const imageFile = getFirstImageFile(event.dataTransfer?.files);
+        if (!imageFile) {
+            setOcrStatus('拖曳內容不是圖片檔', 'is-error');
+            return;
+        }
+        runOcrFromFile(imageFile);
+    });
+
     secondsInput.addEventListener('input', (e) => {
         let val = parseInt(e.target.value);
         if (!isNaN(val)) {
@@ -257,7 +460,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.toggle('header-collapsed', shouldCollapse);
     };
 
-    inputHeaderToggle.addEventListener('click', () => {
+    inputHeaderToggle.addEventListener('click', (event) => {
+        if (event.target instanceof Element
+            && event.target.closest('#ocr-upload-btn, #ocr-file-input')) {
+            return;
+        }
         inputPanel.classList.toggle('collapsed');
         const inputCollapsed = inputPanel.classList.contains('collapsed');
         if (inputCollapsed) {
@@ -456,6 +663,8 @@ document.addEventListener('DOMContentLoaded', () => {
         highlightTime = (savedHighlightTime === 'true');
         highlightTimeCheckbox.checked = highlightTime;
     }
+
+    setOcrStatus(window.PPOCRv5 ? 'OCR 待命' : 'OCR plugin 未載入', window.PPOCRv5 ? '' : 'is-error');
 
     processText();
     updateHeaderState();

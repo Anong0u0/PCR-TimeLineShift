@@ -214,7 +214,13 @@
                 <!-- Input Panel -->
                 <div class="editor-panel white-panel" id="input-panel">
                     <div class="panel-header collapsible-header" id="input-header-toggle" title="點擊以折疊/展開">
-                        <span class="header-title">原始軸 (輸入)</span>
+                        <span class="header-title">
+                            原始軸 (輸入文字 or
+                            <button id="ocr-upload-btn" class="ocr-upload-btn" type="button">上傳圖片</button>
+                            <input id="ocr-file-input" type="file" accept="image/*" hidden>
+                            )
+                            <span id="ocr-status" class="ocr-status" aria-live="polite"></span>
+                        </span>
                         <div class="toggle-wrapper">
                             <span class="toggle-label">折疊</span>
                             <svg class="icon chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
@@ -279,9 +285,16 @@
 
         </main>
     </div>
+    <div id="ocr-drop-overlay" class="ocr-drop-overlay" aria-hidden="true">
+        <div class="ocr-drop-overlay-content">
+            <strong>放開滑鼠開始圖片辨識</strong>
+            <span>可拖曳到任意位置，或點上傳圖片按鈕</span>
+        </div>
+    </div>
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="ppocrv5.plugin.js"></script>
     <script src="script.js"></script>
 </body>
 
