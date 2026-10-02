@@ -21,7 +21,6 @@
     --accent-soft-2: #dfe0fb;
     --accent-text: #4242b5;
     --on-accent: #ffffff;
-    --brand-gradient: linear-gradient(135deg, #6d6ff2 0%, #a26cf0 100%);
 
     --danger: #d93f45;
     --danger-soft: #fdeeee;
@@ -256,6 +255,17 @@ code {
     transform: scale(0.94);
 }
 
+.icon-btn-sm {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-xs);
+}
+
+.icon-btn-sm .icon {
+    width: 16px;
+    height: 16px;
+}
+
 @media (hover: hover) and (pointer: fine) {
     .btn-primary:hover {
         background: var(--accent-hover);
@@ -288,29 +298,31 @@ code {
 .brand {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 0 8px;
+    gap: 8px;
+    padding: 0 4px 0 8px;
 }
 
-.brand-mark {
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    flex-shrink: 0;
-    border-radius: 12px;
-    background: var(--brand-gradient);
-    color: #fff;
-    box-shadow: 0 6px 16px -6px rgba(109, 111, 242, 0.7);
-}
-
-.brand-mark .icon {
-    width: 22px;
-    height: 22px;
+.brand-icon {
+    width: 28px;
+    height: 28px;
+    color: var(--accent);
+    filter: drop-shadow(0 2px 4px rgba(99, 102, 241, 0.2));
 }
 
 .brand-text {
+    flex: 1;
     min-width: 0;
+}
+
+.sidebar-toggle {
+    width: 32px;
+    height: 32px;
+    color: var(--muted);
+}
+
+.sidebar-expand {
+    display: none;
+    margin-left: -6px;
 }
 
 .brand-title {
@@ -322,8 +334,11 @@ code {
 
 .brand-sub {
     margin-top: 2px;
+    overflow: hidden;
     font-size: 12px;
     color: var(--muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .slots-head {
@@ -387,19 +402,101 @@ code {
 .slot-item {
     position: relative;
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1px;
+    align-items: center;
     width: 100%;
     flex-shrink: 0;
-    padding: 9px 12px;
-    border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-2);
-    text-align: left;
     user-select: none;
     transition: background-color 0.15s, color 0.15s;
+}
+
+.slot-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+    padding: 9px 4px 9px 12px;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+}
+
+.slot-main:focus-visible,
+.slot-more:focus-visible {
+    outline-offset: -2px;
+}
+
+.slot-more {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    margin-right: 5px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity 0.12s, background-color 0.15s, color 0.15s;
+}
+
+.slot-more .icon {
+    width: 16px;
+    height: 16px;
+}
+
+.slot-item.active .slot-more,
+.slot-item:focus-within .slot-more,
+.slot-more[aria-expanded="true"] {
+    opacity: 1;
+}
+
+.slot-item.active .slot-more {
+    color: var(--accent-text);
+}
+
+.slot-more[aria-expanded="true"] {
+    background: var(--accent-soft-2);
+    color: var(--accent-text);
+}
+
+@media (hover: none) {
+    .slot-more {
+        opacity: 1;
+    }
+}
+
+.slot-item.renaming .slot-main,
+.slot-item.renaming .slot-more {
+    display: none;
+}
+
+.slot-rename-input {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    /* Same height as a list row (name + meta), so rows below don't jump */
+    margin: 9px 0;
+    padding: 0 10px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: var(--ring);
+}
+
+.slot-rename-input:focus {
+    outline: none;
 }
 
 .slot-item.active {
@@ -466,9 +563,23 @@ code {
 }
 
 @media (hover: hover) and (pointer: fine) {
-    .slot-item:not(.active):hover {
+    .slot-item:not(.active):not(.renaming):hover {
         background: var(--surface-2);
         color: var(--text);
+    }
+
+    .slot-item:hover .slot-more {
+        opacity: 1;
+    }
+
+    .slot-more:hover {
+        background: var(--surface-3);
+        color: var(--text);
+    }
+
+    .slot-item.active .slot-more:hover {
+        background: var(--accent-soft-2);
+        color: var(--accent-text);
     }
 
     .slot-add-btn:hover {
@@ -492,6 +603,10 @@ code {
 
 .topbar-mark {
     display: none;
+    width: 24px;
+    height: 24px;
+    color: var(--accent);
+    filter: drop-shadow(0 2px 4px rgba(99, 102, 241, 0.2));
 }
 
 .title-field {
@@ -624,13 +739,66 @@ code {
 .shift-card {
     display: grid;
     grid-template-columns: auto minmax(160px, 1fr) auto;
+    grid-template-areas:
+        "main slider toggle"
+        "options options options";
     align-items: center;
     gap: 12px 28px;
-    padding: 14px 16px 14px 20px;
+    padding: 14px 12px 14px 20px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow-1);
+}
+
+.shift-main {
+    grid-area: main;
+}
+
+.shift-slider {
+    grid-area: slider;
+}
+
+.shift-options {
+    grid-area: options;
+}
+
+.options-summary {
+    grid-area: summary;
+}
+
+.collapse-btn {
+    grid-area: toggle;
+    align-self: start;
+    width: 34px;
+    height: 34px;
+    color: var(--muted);
+}
+
+.collapse-btn .icon {
+    transition: transform 0.2s;
+}
+
+/* Folded: keep the seconds, swap the options for a one-line summary */
+.shift-card.collapsed {
+    grid-template-columns: auto minmax(160px, 1fr) auto auto;
+    grid-template-areas: "main slider summary toggle";
+}
+
+.shift-card.collapsed .shift-options {
+    display: none;
+}
+
+.shift-card:not(.collapsed) .options-summary {
+    display: none;
+}
+
+.shift-card.collapsed .collapse-btn {
+    align-self: center;
+}
+
+.shift-card.collapsed .collapse-btn .icon {
+    transform: rotate(180deg);
 }
 
 .shift-main {
@@ -828,10 +996,136 @@ code {
     transform: translateX(-50%);
 }
 
-.shift-side {
+/* Conversion options, always visible */
+.shift-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-right: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.opt-chip {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    height: 38px;
+    padding-right: 4px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text-2);
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.opt-chip:has(input:checked) {
+    background: var(--accent-soft);
+    border-color: var(--accent-soft-2);
+    color: var(--accent-text);
+}
+
+.opt-chip:has(input:focus-visible) {
+    border-color: var(--accent);
+    box-shadow: var(--ring);
+}
+
+.opt-toggle {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
+    height: 100%;
+    padding: 0 4px 0 12px;
+    border-radius: 999px 0 0 999px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+
+.opt-toggle input {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin: 0;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 5px;
+    background: var(--surface) no-repeat center / 12px 12px;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.opt-toggle input:checked {
+    border-color: var(--accent);
+    background-color: var(--accent);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+
+.opt-toggle input:focus-visible {
+    outline: none;
+}
+
+.opt-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.opt-info {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.opt-info .icon {
+    width: 15px;
+    height: 15px;
+}
+
+.opt-info[aria-describedby] {
+    background: var(--surface-3);
+    color: var(--text);
+}
+
+.opt-chip:has(input:checked) .opt-info {
+    color: var(--accent-text);
+}
+
+.opt-chip:has(input:checked) .opt-info[aria-describedby] {
+    background: var(--accent-soft-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .opt-chip:hover {
+        border-color: var(--border-strong);
+    }
+
+    .opt-chip:has(input:checked):hover {
+        border-color: var(--accent);
+    }
+
+    .opt-info:hover {
+        background: var(--surface-3);
+        color: var(--text);
+    }
+
+    .opt-chip:has(input:checked) .opt-info:hover {
+        background: var(--accent-soft-2);
+        color: var(--accent-text);
+    }
 }
 
 .options-summary {
@@ -840,6 +1134,11 @@ code {
     justify-content: flex-end;
     gap: 4px;
     max-width: 260px;
+}
+
+.summary-empty {
+    font-size: 12px;
+    color: var(--muted);
 }
 
 .summary-pill {
@@ -853,14 +1152,48 @@ code {
     white-space: nowrap;
 }
 
-.options-btn {
-    border-color: var(--border);
+/* Help bubble for the options */
+.tooltip {
+    position: fixed;
+    z-index: 160;
+    max-width: min(280px, calc(100vw - 20px));
+    padding: 8px 11px;
+    border-radius: 9px;
+    background: #1f2232;
+    color: #f2f3f8;
+    font-size: 12.5px;
+    line-height: 1.55;
+    box-shadow: var(--shadow-2);
+    animation: fade-in 0.12s ease-out;
 }
 
-.options-btn[aria-expanded="true"] {
-    background: var(--accent-soft);
-    border-color: transparent;
-    color: var(--accent-text);
+[data-theme="dark"] .tooltip {
+    background: #2a2f43;
+    border: 1px solid #3a4058;
+}
+
+.tooltip::after {
+    content: "";
+    position: absolute;
+    left: var(--arrow-x, 50%);
+    width: 10px;
+    height: 10px;
+    margin-left: -5px;
+    background: inherit;
+    border: inherit;
+    transform: rotate(45deg);
+}
+
+.tooltip[data-placement="top"]::after {
+    bottom: -5px;
+    border-top: 0;
+    border-left: 0;
+}
+
+.tooltip[data-placement="bottom"]::after {
+    top: -5px;
+    border-bottom: 0;
+    border-right: 0;
 }
 
 /* =========================================
@@ -894,6 +1227,85 @@ code {
 .pane-input:focus-within {
     border-color: var(--accent);
     box-shadow: var(--ring);
+}
+
+/* Folded input column: a slim rail that opens it again */
+.pane-rail {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 16px 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-2);
+    transition: background-color 0.15s, color 0.15s;
+}
+
+/* One character per line; sturdier than vertical writing-mode across CJK fonts */
+.pane-rail-label {
+    width: 1em;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.35;
+    text-align: center;
+    word-break: break-all;
+}
+
+.pane-rail:focus-visible {
+    outline-offset: -4px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .pane-rail:hover {
+        background: var(--surface-2);
+        color: var(--accent-text);
+    }
+}
+
+@media (min-width: 768px) {
+    .app.input-collapsed .panes {
+        grid-template-columns: 48px minmax(0, 1fr);
+    }
+
+    .app.input-collapsed .pane-input .pane-head,
+    .app.input-collapsed #input-text {
+        display: none;
+    }
+
+    .app.input-collapsed .pane-rail {
+        display: flex;
+    }
+
+    .app.input-collapsed .pane-input:focus-within {
+        border-color: var(--border);
+        box-shadow: var(--shadow-1);
+    }
+}
+
+/* Folded 刀 list (wide screens only; narrow screens keep the bottom strip) */
+@media (min-width: 1024px) {
+    .app.sidebar-collapsed {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .app.sidebar-collapsed .sidebar {
+        display: none;
+    }
+
+    .app.sidebar-collapsed .sidebar-expand {
+        display: inline-grid;
+    }
+
+    .app.sidebar-collapsed .topbar-mark {
+        display: block;
+    }
+
+    .app.sidebar-collapsed~.toast-region {
+        left: 50%;
+    }
 }
 
 .pane-head {
@@ -1612,13 +2024,17 @@ div.option {
 
     .slot-item {
         width: auto;
-        max-width: 11rem;
+        max-width: 12rem;
         height: 40px;
-        justify-content: center;
-        padding: 0 16px;
         border-radius: 999px;
         background: var(--surface-2);
         border: 1px solid var(--border);
+    }
+
+    .slot-main {
+        justify-content: center;
+        height: 100%;
+        padding: 0 16px;
     }
 
     .slot-item.active {
@@ -1632,20 +2048,48 @@ div.option {
         display: none;
     }
 
-    .topbar-mark {
-        display: grid;
-        place-items: center;
-        width: 34px;
-        height: 34px;
-        flex-shrink: 0;
-        border-radius: 10px;
-        background: var(--brand-gradient);
-        color: #fff;
+    /* Only the selected chip carries its ⋯ button, to keep the strip compact */
+    .slot-more {
+        display: none;
     }
 
-    .topbar-mark .icon {
-        width: 19px;
-        height: 19px;
+    .slot-list .slot-item.active .slot-more {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        margin: 0 4px 0 -10px;
+        border-radius: 999px;
+        color: var(--on-accent);
+        opacity: 1;
+    }
+
+    .slot-list .slot-item.active .slot-more:hover,
+    .slot-list .slot-item.active .slot-more[aria-expanded="true"] {
+        background: rgba(255, 255, 255, 0.2);
+        color: var(--on-accent);
+    }
+
+    .slot-list .slot-item.renaming .slot-more {
+        display: none;
+    }
+
+    .slot-item.renaming,
+    .slot-item.renaming.active {
+        background: transparent;
+        border-color: transparent;
+    }
+
+    .slot-rename-input {
+        width: 11rem;
+        flex: none;
+        height: 40px;
+        margin: 0;
+        padding: 0 14px;
+        border-radius: 999px;
+    }
+
+    .topbar-mark {
+        display: block;
     }
 
     .slot-title {
@@ -1657,11 +2101,16 @@ div.option {
     .shift-card {
         grid-template-columns: auto minmax(0, 1fr) auto;
         gap: 10px 20px;
-        padding: 12px 12px 12px 16px;
+        padding: 12px 10px 12px 16px;
+    }
+
+    .shift-card.collapsed {
+        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        grid-template-areas: "main slider summary toggle";
     }
 
     .options-summary {
-        display: none;
+        max-width: 200px;
     }
 
     .toast-region {
@@ -1706,35 +2155,66 @@ div.option {
     .shift-card {
         grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
-            "main side"
-            "slider slider";
-        gap: 4px 8px;
-        padding: 10px 10px 8px 14px;
+            "main toggle"
+            "slider slider"
+            "options options";
+        gap: 4px 6px;
+        padding: 10px 8px 10px 14px;
+    }
+
+    .shift-card.collapsed {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "main toggle"
+            "summary summary";
+    }
+
+    .shift-card.collapsed .shift-slider {
+        display: none;
+    }
+
+    .options-summary {
+        justify-content: flex-start;
+        max-width: none;
+        padding-bottom: 2px;
     }
 
     .shift-main {
-        grid-area: main;
         justify-content: space-between;
         gap: 10px;
     }
 
-    .shift-side {
-        grid-area: side;
-    }
-
     .shift-slider {
-        grid-area: slider;
         padding-top: 2px;
     }
 
-    .options-btn {
-        width: 44px;
-        height: 44px;
-        padding: 0;
+    .collapse-btn {
+        align-self: center;
+        width: 36px;
+        height: 36px;
     }
 
-    .options-btn .btn-label {
-        display: none;
+    .shift-options {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        margin-right: 6px;
+        padding-top: 8px;
+    }
+
+    .opt-chip {
+        height: 36px;
+    }
+
+    .opt-toggle {
+        flex: 1;
+        gap: 6px;
+        padding-left: 10px;
+    }
+
+    .opt-info {
+        width: 26px;
+        height: 26px;
     }
 
     .step-btn {
@@ -1849,6 +2329,30 @@ div.option {
         min-width: 0;
     }
 
+    .shift-options {
+        margin-right: 0;
+    }
+
+    .opt-toggle {
+        gap: 5px;
+        padding-left: 8px;
+        font-size: 12px;
+        line-height: 1.2;
+        white-space: normal;
+    }
+
+    .opt-label {
+        overflow: visible;
+    }
+
+    .opt-chip {
+        padding-right: 2px;
+    }
+
+    .opt-info {
+        width: 24px;
+    }
+
     .seconds-box {
         min-width: 64px;
     }
@@ -1870,11 +2374,47 @@ div.option {
         min-height: 40px;
     }
 
+    /* Short screens: one compact row of options under the seconds */
     .shift-card {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas:
+            "main slider toggle"
+            "options options options";
+        row-gap: 6px;
         padding-top: 6px;
         padding-bottom: 6px;
     }
 
+    .shift-card.collapsed {
+        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        grid-template-areas: "main slider summary toggle";
+    }
+
+    .shift-card.collapsed .shift-slider {
+        display: block;
+    }
+
+    .shift-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-right: 0;
+        padding-top: 6px;
+    }
+
+    .opt-chip {
+        height: 32px;
+    }
+
+    .options-summary {
+        justify-content: flex-end;
+        max-width: 200px;
+        padding-bottom: 0;
+    }
+
+    .collapse-btn {
+        align-self: center;
+    }
 }
 
 @media (max-height: 520px) and (min-width: 600px) and (max-width: 1023px) {
@@ -1884,7 +2424,8 @@ div.option {
     }
 
     .slot-item,
-    .slot-add-btn {
+    .slot-add-btn,
+    .slot-rename-input {
         height: 34px;
     }
 }

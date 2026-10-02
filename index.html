@@ -62,7 +62,7 @@
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Source+Code+Pro:wght@400;500;600&display=swap"
         rel="stylesheet">
 
-    <link rel="stylesheet" href="style.css?v=20261002r">
+    <link rel="stylesheet" href="style.css?v=20261003">
 </head>
 
 <body>
@@ -71,10 +71,39 @@
         <defs>
             <symbol id="i-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="13" r="8"></circle>
-                <path d="M12 9v4l2.5 2"></path>
-                <path d="M10 2h4"></path>
-                <path d="M19 6l1.5-1.5"></path>
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </symbol>
+            <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 16v-4"></path>
+                <path d="M12 8h.01"></path>
+            </symbol>
+            <symbol id="i-chevron-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="m18 15-6-6-6 6"></path>
+            </symbol>
+            <symbol id="i-chevrons-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="m11 17-5-5 5-5"></path>
+                <path d="m18 17-5-5 5-5"></path>
+            </symbol>
+            <symbol id="i-chevrons-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="m6 17 5-5-5-5"></path>
+                <path d="m13 17 5-5-5-5"></path>
+            </symbol>
+            <symbol id="i-panel-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                <path d="M9 3v18"></path>
+            </symbol>
+            <symbol id="i-type" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 7V4h16v3"></path>
+                <path d="M9 20h6"></path>
+                <path d="M12 4v16"></path>
             </symbol>
             <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -196,11 +225,15 @@
         <!-- 刀 list: sidebar on desktop, bottom strip on smaller screens -->
         <aside class="sidebar" aria-label="記憶管理">
             <div class="brand">
-                <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-logo"></use></svg></span>
+                <svg class="icon brand-icon" aria-hidden="true"><use href="#i-logo"></use></svg>
                 <div class="brand-text">
                     <h1 class="brand-title">補償刀時間軸</h1>
-                    <p class="brand-sub">公主連結 Re:Dive 時間軸轉換</p>
+                    <p class="brand-sub">公主連結 Re:Dive</p>
                 </div>
+                <button id="sidebar-collapse" class="icon-btn sidebar-toggle" type="button" aria-label="收合刀列表"
+                    title="收合刀列表" aria-controls="slot-list" aria-expanded="true">
+                    <svg class="icon"><use href="#i-panel-left"></use></svg>
+                </button>
             </div>
 
             <div class="slots-head">
@@ -211,7 +244,7 @@
                 </button>
             </div>
 
-            <div id="slot-list" class="slot-list" aria-label="已儲存的刀"></div>
+            <div id="slot-list" class="slot-list" role="list" aria-label="已儲存的刀"></div>
 
             <div class="sidebar-foot">
                 <a class="foot-link" href="https://github.com/Anong0u0/PCR-TimeLineShift" target="_blank"
@@ -225,7 +258,11 @@
         <main class="workspace">
             <!-- Current 刀 -->
             <header class="topbar">
-                <span class="topbar-mark" aria-hidden="true"><svg class="icon"><use href="#i-logo"></use></svg></span>
+                <button id="sidebar-expand" class="icon-btn sidebar-toggle sidebar-expand" type="button"
+                    aria-label="展開刀列表" title="展開刀列表" aria-controls="slot-list" aria-expanded="false">
+                    <svg class="icon"><use href="#i-panel-left"></use></svg>
+                </button>
+                <svg class="icon topbar-mark" aria-hidden="true"><use href="#i-logo"></use></svg>
                 <div class="title-field">
                     <input id="slot-title" class="slot-title" type="text" maxlength="50" autocomplete="off"
                         spellcheck="false" enterkeyhint="done" aria-label="刀名稱（留空則使用第一行）" title="點擊改名">
@@ -251,7 +288,7 @@
             </header>
 
             <!-- Remaining seconds -->
-            <section class="shift-card" aria-label="剩餘秒數">
+            <section class="shift-card" id="controls-card" aria-label="剩餘秒數與選項">
                 <div class="shift-main">
                     <label class="shift-label" for="seconds-input">
                         <span class="shift-label-title">剩餘秒數</span>
@@ -281,14 +318,53 @@
                         <span style="--p: 1">90</span>
                     </div>
                 </div>
-                <div class="shift-side">
-                    <div id="options-summary" class="options-summary" aria-hidden="true"></div>
-                    <button id="options-btn" class="btn btn-ghost options-btn" type="button" aria-haspopup="dialog"
-                        aria-expanded="false" aria-controls="options-popover" title="轉換與顯示選項">
-                        <svg class="icon"><use href="#i-sliders"></use></svg>
-                        <span class="btn-label">選項</span>
-                    </button>
+                <div class="shift-options" role="group" aria-label="轉換選項">
+                    <div class="opt-chip">
+                        <label class="opt-toggle" for="hide-low-time">
+                            <input type="checkbox" id="hide-low-time" checked data-summary="隱藏&lt;1秒">
+                            <span class="opt-label">隱藏&lt;1秒軸</span>
+                        </label>
+                        <button type="button" class="opt-info" aria-label="隱藏&lt;1秒軸的說明"
+                            data-tip="隱藏換算後不到 1 秒的行（含其後的說明行）。關閉時改以「// === 補償時間不足 ===」分隔提示。">
+                            <svg class="icon"><use href="#i-info"></use></svg>
+                        </button>
+                    </div>
+                    <div class="opt-chip">
+                        <label class="opt-toggle" for="strict-mode">
+                            <input type="checkbox" id="strict-mode" data-summary="嚴格">
+                            <span class="opt-label">嚴格模式</span>
+                        </label>
+                        <button type="button" class="opt-info" aria-label="嚴格模式的說明"
+                            data-tip="每行只換算第一個時間，後面的時間保持原樣。">
+                            <svg class="icon"><use href="#i-info"></use></svg>
+                        </button>
+                    </div>
+                    <div class="opt-chip">
+                        <label class="opt-toggle" for="ignore-comment">
+                            <input type="checkbox" id="ignore-comment" data-summary="含註解">
+                            <span class="opt-label">換算註解時間</span>
+                        </label>
+                        <button type="button" class="opt-info" aria-label="換算註解時間的說明"
+                            data-tip="預設不處理 # 或 // 之後的時間，開啟後也會一併換算。">
+                            <svg class="icon"><use href="#i-info"></use></svg>
+                        </button>
+                    </div>
+                    <div class="opt-chip">
+                        <label class="opt-toggle" for="highlight-time">
+                            <input type="checkbox" id="highlight-time" data-summary="凸顯">
+                            <span class="opt-label">凸顯時間</span>
+                        </label>
+                        <button type="button" class="opt-info" aria-label="凸顯時間的說明"
+                            data-tip="在結果中以底色標示換算過的時間。">
+                            <svg class="icon"><use href="#i-info"></use></svg>
+                        </button>
+                    </div>
                 </div>
+                <div id="options-summary" class="options-summary" aria-hidden="true"></div>
+                <button id="controls-collapse" class="icon-btn collapse-btn" type="button" aria-expanded="true"
+                    aria-label="摺疊設定" title="摺疊設定">
+                    <svg class="icon"><use href="#i-chevron-up"></use></svg>
+                </button>
             </section>
 
             <!-- Editors -->
@@ -328,10 +404,19 @@
                             <button class="btn btn-ghost btn-sm js-clear" type="button" title="清空原始軸">
                                 <svg class="icon"><use href="#i-eraser"></use></svg>清空
                             </button>
+                            <button id="input-collapse" class="icon-btn icon-btn-sm" type="button" aria-expanded="true"
+                                aria-controls="input-text" aria-label="摺疊原始軸" title="摺疊原始軸">
+                                <svg class="icon"><use href="#i-chevrons-left"></use></svg>
+                            </button>
                         </div>
                     </header>
                     <textarea id="input-text" spellcheck="false" autocomplete="off" aria-label="原始軸"
                         placeholder="在此貼上 90 秒的時間軸，例如：&#10;1:30 開場&#10;1:12 UB 凱留&#10;0:48 UB 鏡華&#10;&#10;也可以直接貼上或拖曳截圖，自動辨識文字。"></textarea>
+                    <button id="input-expand" class="pane-rail" type="button" aria-controls="input-text"
+                        aria-expanded="false" title="展開原始軸">
+                        <svg class="icon"><use href="#i-chevrons-right"></use></svg>
+                        <span class="pane-rail-label">展開原始軸</span>
+                    </button>
                 </section>
 
                 <section class="pane pane-output" id="output-pane" aria-label="調整後結果">
@@ -378,47 +463,35 @@
             <svg class="icon"><use href="#i-trash"></use></svg>刪除這刀
         </button>
         <div class="menu-sep" role="separator"></div>
+        <button type="button" class="menu-item" role="menuitem" data-action="display">
+            <svg class="icon"><use href="#i-type"></use></svg>顯示設定（換行、字級）
+        </button>
         <button type="button" class="menu-item" role="menuitem" data-action="fullscreen" id="fullscreen-toggle" hidden>
             <svg class="icon"><use href="#i-maximize"></use></svg><span class="fullscreen-label">全螢幕</span>
         </button>
     </div>
 
-    <!-- Options -->
-    <div id="options-popover" class="popover options-popover" role="dialog" aria-labelledby="options-title" hidden>
+    <!-- Per-刀 menu (left list) -->
+    <div id="slot-menu" class="popover menu" role="menu" aria-label="這刀的動作" hidden>
+        <button type="button" class="menu-item" role="menuitem" data-action="rename">
+            <svg class="icon"><use href="#i-pencil"></use></svg>重新命名
+        </button>
+        <button type="button" class="menu-item" role="menuitem" data-action="duplicate">
+            <svg class="icon"><use href="#i-files"></use></svg>建立複本
+        </button>
+        <button type="button" class="menu-item menu-item-danger" role="menuitem" data-action="delete">
+            <svg class="icon"><use href="#i-trash"></use></svg>刪除
+        </button>
+    </div>
+
+    <!-- Display settings -->
+    <div id="display-popover" class="popover options-popover" role="dialog" aria-labelledby="display-title" hidden>
         <div class="popover-head">
-            <h2 id="options-title" class="popover-title">轉換與顯示</h2>
+            <h2 id="display-title" class="popover-title">顯示設定</h2>
             <button type="button" class="icon-btn js-popover-close" aria-label="關閉">
                 <svg class="icon"><use href="#i-x"></use></svg>
             </button>
         </div>
-        <label class="option" for="hide-low-time">
-            <span class="option-text">
-                <span class="option-title">隱藏不足 1 秒的軸</span>
-                <span class="option-desc">隱藏換算後不到 1 秒的行（含其後的說明行）。關閉時改以「<code>// === 補償時間不足 ===</code>」分隔提示。</span>
-            </span>
-            <input type="checkbox" class="switch" id="hide-low-time" checked data-summary="隱藏&lt;1秒">
-        </label>
-        <label class="option" for="strict-mode">
-            <span class="option-text">
-                <span class="option-title">嚴格模式</span>
-                <span class="option-desc">每行只換算第一個時間，後面的時間保持原樣。</span>
-            </span>
-            <input type="checkbox" class="switch" id="strict-mode" data-summary="嚴格">
-        </label>
-        <label class="option" for="ignore-comment">
-            <span class="option-text">
-                <span class="option-title">換算註解中的時間</span>
-                <span class="option-desc">預設不處理 <code>#</code> 或 <code>//</code> 之後的時間，開啟後也會一併換算。</span>
-            </span>
-            <input type="checkbox" class="switch" id="ignore-comment" data-summary="含註解">
-        </label>
-        <label class="option" for="highlight-time">
-            <span class="option-text">
-                <span class="option-title">凸顯時間</span>
-                <span class="option-desc">在結果中以底色標示換算過的時間。</span>
-            </span>
-            <input type="checkbox" class="switch" id="highlight-time" data-summary="凸顯">
-        </label>
         <label class="option" for="wrap-lines">
             <span class="option-text">
                 <span class="option-title">自動換行</span>
@@ -439,6 +512,7 @@
     </div>
 
     <div id="popover-backdrop" class="popover-backdrop" hidden></div>
+    <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
     <div id="toast-region" class="toast-region" aria-live="polite"></div>
 
     <div id="ocr-drop-overlay" class="ocr-drop-overlay" aria-hidden="true">
@@ -452,7 +526,7 @@
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="ppocrv5.plugin.js?v=20260227"></script>
-    <script src="script.js?v=20261002r"></script>
+    <script src="script.js?v=20261003"></script>
 </body>
 
 </html>

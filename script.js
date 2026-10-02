@@ -20,9 +20,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const highlightTimeCheckbox = $('#highlight-time');
     const wrapLinesCheckbox = $('#wrap-lines');
     const fontSizeGroup = $('#font-size-group');
-    const optionsBtn = $('#options-btn');
-    const optionsPopover = $('#options-popover');
+    const displayPopover = $('#display-popover');
     const optionsSummary = $('#options-summary');
+    const controlsCard = $('#controls-card');
+    const controlsCollapseBtn = $('#controls-collapse');
+    const inputCollapseBtn = $('#input-collapse');
+    const inputExpandBtn = $('#input-expand');
+    const sidebarCollapseBtn = $('#sidebar-collapse');
+    const sidebarExpandBtn = $('#sidebar-expand');
+    const slotMenu = $('#slot-menu');
+    const tooltip = $('#tooltip');
     const moreBtn = $('#more-btn');
     const moreMenu = $('#more-menu');
     const popoverBackdrop = $('#popover-backdrop');
@@ -41,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
     const narrowScreen = window.matchMedia('(max-width: 767px)');
+    const wideScreen = window.matchMedia('(min-width: 1024px)');
 
     let remainingSeconds = 90;
     let strictMode = false;
@@ -497,28 +505,44 @@ document.addEventListener('DOMContentLoaded', () => {
         const label = getSlotLabel(slot);
         item.querySelector('.slot-name').textContent = label;
         item.querySelector('.slot-meta').textContent = getSlotMeta(slot);
-        item.title = label;
+        item.querySelector('.slot-main').title = label;
+        item.querySelector('.slot-more').setAttribute('aria-label', `「${label}」的動作`);
     };
 
     const createSlotItem = (slot) => {
-        const item = document.createElement('button');
+        const isActive = slot.id === activeSlotId;
+        const item = document.createElement('div');
+        const main = document.createElement('button');
         const name = document.createElement('span');
         const meta = document.createElement('span');
-        item.type = 'button';
+        const more = document.createElement('button');
         item.className = 'slot-item';
         item.dataset.slotId = slot.id;
+        item.setAttribute('role', 'listitem');
+        item.classList.toggle('active', isActive);
+        main.type = 'button';
+        main.className = 'slot-main';
+        main.tabIndex = isActive ? 0 : -1;
+        if (isActive) {
+            main.setAttribute('aria-current', 'true');
+        }
         name.className = 'slot-name';
         meta.className = 'slot-meta';
-        item.append(name, meta);
+        main.append(name, meta);
+        more.type = 'button';
+        more.className = 'slot-more';
+        more.tabIndex = isActive ? 0 : -1;
+        more.title = '改名、建立複本、刪除';
+        more.setAttribute('aria-haspopup', 'menu');
+        more.setAttribute('aria-expanded', 'false');
+        more.setAttribute('aria-controls', 'slot-menu');
+        more.append(createIcon('i-more'));
+        item.append(main, more);
         fillSlotItem(item, slot);
-        const isActive = slot.id === activeSlotId;
-        item.classList.toggle('active', isActive);
-        item.tabIndex = isActive ? 0 : -1;
-        if (isActive) {
-            item.setAttribute('aria-current', 'true');
-        }
         return item;
     };
+
+    const getSlotItem = (id) => Array.from(slotList.children).find((item) => item.dataset.slotId === id);
 
     const scrollItemIntoView = (item) => {
         const margin = 8;
@@ -545,15 +569,20 @@ document.addEventListener('DOMContentLoaded', () => {
         slotList.classList.toggle('can-scroll-right', hasMoreRight);
     };
 
+    let revealedSlotId = null;
     const renderSlotList = () => {
         const hadFocus = slotList.contains(document.activeElement);
         slotList.replaceChildren(...slots.map(createSlotItem));
         slotCount.textContent = slots.length;
         const activeItem = getActiveItem();
         if (activeItem) {
-            scrollItemIntoView(activeItem);
+            // Tidying other 刀 must not yank a scrolled list back to the current one.
+            if (revealedSlotId !== activeSlotId) {
+                revealedSlotId = activeSlotId;
+                scrollItemIntoView(activeItem);
+            }
             if (hadFocus) {
-                activeItem.focus({ preventScroll: true });
+                activeItem.querySelector('.slot-main').focus({ preventScroll: true });
             }
         }
         updateScrollHint();
@@ -594,6 +623,10 @@ document.addEventListener('DOMContentLoaded', () => {
         codeContent.scrollTop = 0;
         if (!text.trim()) {
             setView('input');
+            // An empty 刀 needs the editor; the fold only exists on wider screens.
+            if (app.classList.contains('input-collapsed') && !narrowScreen.matches) {
+                setInputCollapsed(false);
+            }
         }
         saveSlots();
         renderSlotList();
@@ -619,15 +652,24 @@ document.addEventListener('DOMContentLoaded', () => {
         processText();
     };
 
+    // Commit a pending title edit to the 刀 it belongs to before another one loads.
+    const commitTitleEdit = () => {
+        if (document.activeElement === slotTitle) {
+            slotTitle.blur();
+        }
+    };
+
     const switchSlot = (id) => {
         if (id === activeSlotId || !slots.some((slot) => slot.id === id)) {
             return;
         }
+        commitTitleEdit();
         activeSlotId = id;
         loadActiveSlot();
     };
 
     const insertSlot = (slot, index = slots.length) => {
+        commitTitleEdit();
         slots.splice(index, 0, slot);
         activeSlotId = slot.id;
         loadActiveSlot();
@@ -640,8 +682,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const duplicateActiveSlot = () => {
-        const source = getActiveSlot();
+    const duplicateSlot = (id) => {
+        const source = slots.find((slot) => slot.id === id);
         if (!source) {
             return;
         }
@@ -649,7 +691,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('已建立複本', { id: 'duplicate', mode: 'is-ready', timeout: 2500 });
     };
 
-    const restoreSlot = (slot, index) => {
+    const restoreSlot = (slot, index, activate) => {
         if (slots.some((item) => item.id === slot.id)) {
             return;
         }
@@ -658,14 +700,21 @@ document.addEventListener('DOMContentLoaded', () => {
             slots.splice(slots.indexOf(placeholder), 1);
         }
         placeholderSlotId = null;
-        insertSlot(slot, Math.min(index, slots.length));
+        if (activate || !getActiveSlot()) {
+            insertSlot(slot, Math.min(index, slots.length));
+            return;
+        }
+        slots.splice(Math.min(index, slots.length), 0, slot);
+        saveSlots();
+        renderSlotList();
     };
 
-    const deleteActiveSlot = () => {
-        const slot = getActiveSlot();
+    const deleteSlot = (id) => {
+        const slot = slots.find((item) => item.id === id);
         if (!slot) {
             return;
         }
+        const wasActive = id === activeSlotId;
         const index = slots.indexOf(slot);
         slots.splice(index, 1);
         placeholderSlotId = null;
@@ -674,13 +723,18 @@ document.addEventListener('DOMContentLoaded', () => {
             slots.push(blank);
             placeholderSlotId = blank.id;
         }
-        activeSlotId = slots[Math.min(index, slots.length - 1)].id;
-        loadActiveSlot();
+        if (wasActive) {
+            activeSlotId = slots[Math.min(index, slots.length - 1)].id;
+            loadActiveSlot();
+        } else {
+            saveSlots();
+            renderSlotList();
+        }
         if (slot.text.trim() || slot.name.trim()) {
             showToast(`已刪除「${getSlotLabel(slot)}」`, {
-                id: 'slot-delete',
+                id: `slot-delete-${slot.id}`,
                 timeout: 8000,
-                action: { label: '復原', onClick: () => restoreSlot(slot, index) },
+                action: { label: '復原', onClick: () => restoreSlot(slot, index, wasActive) },
             });
         }
     };
@@ -688,6 +742,71 @@ document.addEventListener('DOMContentLoaded', () => {
     const startRenameSlot = () => {
         slotTitle.focus();
         slotTitle.select();
+    };
+
+    let listRenderPending = false;
+
+    // Rename right inside the list: Enter or leaving the field saves, Esc cancels.
+    const startInlineRename = (id) => {
+        const item = getSlotItem(id);
+        const slot = slots.find((entry) => entry.id === id);
+        if (!item || !slot || item.querySelector('.slot-rename-input')) {
+            return;
+        }
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'slot-rename-input';
+        input.value = slot.name;
+        input.placeholder = getSlotLabel({ ...slot, name: '' });
+        input.maxLength = 50;
+        input.enterKeyHint = 'done';
+        input.setAttribute('aria-label', '刀名稱（留空則使用第一行）');
+
+        let finished = false;
+        const finish = (shouldSave) => {
+            if (finished) {
+                return;
+            }
+            finished = true;
+            const target = slots.find((entry) => entry.id === id);
+            const name = input.value.trim();
+            if (shouldSave && target && name !== target.name) {
+                target.name = name;
+                target.updatedAt = Date.now();
+                saveSlots();
+            }
+            // Update in place so a click that ends the rename still reaches the button it was aimed at.
+            if (target && item.isConnected && !listRenderPending) {
+                input.remove();
+                item.classList.remove('renaming');
+                fillSlotItem(item, target);
+            } else {
+                listRenderPending = false;
+                renderSlotList();
+            }
+            renderTitle();
+        };
+
+        input.addEventListener('keydown', (event) => {
+            if (event.isComposing || event.keyCode === 229) {
+                return;
+            }
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                finish(true);
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                finish(false);
+            }
+        });
+        input.addEventListener('blur', () => finish(true));
+
+        item.classList.add('renaming');
+        item.prepend(input);
+        input.focus();
+        input.select();
+        scrollItemIntoView(item);
     };
 
     const clearActiveSlotText = () => {
@@ -751,40 +870,86 @@ document.addEventListener('DOMContentLoaded', () => {
         processText();
     });
 
+    const focusActiveItem = () => getActiveItem()?.querySelector('.slot-main').focus({ preventScroll: true });
+    const getItemId = (target) => target.closest('.slot-item')?.dataset.slotId;
+
+    slotList.addEventListener('mousedown', (event) => {
+        const renameInput = slotList.querySelector('.slot-rename-input');
+        const main = event.target.closest('.slot-main');
+        if (event.button !== 0 || !renameInput || !main) {
+            return;
+        }
+        // Committing the rename re-renders the list, so the click would miss: switch right away.
+        event.preventDefault();
+        const id = getItemId(main);
+        renameInput.blur();
+        switchSlot(id);
+    });
+
     slotList.addEventListener('click', (event) => {
-        const item = event.target.closest('.slot-item');
-        if (item) {
-            switchSlot(item.dataset.slotId);
+        const more = event.target.closest('.slot-more');
+        if (more) {
+            openSlotMenu(getItemId(more), more);
+            return;
+        }
+        const main = event.target.closest('.slot-main');
+        if (main) {
+            switchSlot(getItemId(main));
         }
     });
 
     slotList.addEventListener('dblclick', (event) => {
-        const item = event.target.closest('.slot-item');
-        if (item && item.dataset.slotId === activeSlotId) {
-            startRenameSlot();
+        const main = event.target.closest('.slot-main');
+        if (main) {
+            startInlineRename(getItemId(main));
         }
     });
 
     slotList.addEventListener('keydown', (event) => {
+        if (event.target.closest('.slot-rename-input')) {
+            return;
+        }
+        const id = getItemId(event.target);
+        if (id && event.key === 'F2') {
+            event.preventDefault();
+            startInlineRename(id);
+            return;
+        }
+        if (id && event.key === 'Delete') {
+            event.preventDefault();
+            // Holding the key must not wipe out one 刀 per auto-repeat.
+            if (event.repeat) {
+                return;
+            }
+            deleteSlot(id);
+            focusActiveItem();
+            return;
+        }
         const steps = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
         if (event.key === 'Home' || event.key === 'End') {
             event.preventDefault();
             switchSlot(slots[event.key === 'Home' ? 0 : slots.length - 1].id);
-            getActiveItem()?.focus();
+            focusActiveItem();
             return;
         }
         if (!(event.key in steps)) {
             return;
         }
         event.preventDefault();
-        const index = slots.findIndex((slot) => slot.id === activeSlotId);
+        const index = slots.findIndex((slot) => slot.id === (id || activeSlotId));
         const next = slots[Math.max(0, Math.min(slots.length - 1, index + steps[event.key]))];
         switchSlot(next.id);
-        getActiveItem()?.focus();
+        focusActiveItem();
     });
 
     slotAddBtn.addEventListener('click', addSlot);
-    slotList.addEventListener('scroll', updateScrollHint, { passive: true });
+    slotList.addEventListener('scroll', () => {
+        updateScrollHint();
+        // The menu is pinned to its ⋯; once the list moves it would point at the wrong 刀.
+        if (openPopover?.popover === slotMenu && !slotMenu.classList.contains('as-sheet')) {
+            closePopover({ restoreFocus: false });
+        }
+    }, { passive: true });
     window.addEventListener('resize', updateScrollHint);
 
     let titleBeforeEdit = '';
@@ -848,7 +1013,11 @@ document.addEventListener('DOMContentLoaded', () => {
             inputText.value = activeText;
             processText();
         }
-        renderSlotList();
+        if (slotList.querySelector('.slot-rename-input')) {
+            listRenderPending = true;
+        } else {
+            renderSlotList();
+        }
         renderTitle();
     });
 
@@ -1022,7 +1191,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return null;
         }
         const fileFromFiles = getFirstImageFile(clipboardData.files);
-        return fileFromFiles || null;
+        if (fileFromFiles) {
+            return fileFromFiles;
+        }
+        // Some browsers only expose a pasted screenshot through items.
+        const item = Array.from(clipboardData.items || [])
+            .find((entry) => entry.kind === 'file' && entry.type.startsWith('image/'));
+        return item?.getAsFile() || null;
     };
     const dragHasFiles = (event) => Array.from(event?.dataTransfer?.types || []).includes('Files');
     const setDropOverlayVisible = (visible) => {
@@ -1108,7 +1283,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const isEditableTarget = (target) => target instanceof Element
-        && Boolean(target.closest('input, textarea, [contenteditable="true"]'));
+        && Boolean(target.closest('input:not([type="checkbox"]):not([type="range"]), textarea, [contenteditable="true"]'));
 
     document.addEventListener('paste', (event) => {
         const imageFile = getClipboardImageFile(event.clipboardData);
@@ -1201,7 +1376,7 @@ document.addEventListener('DOMContentLoaded', () => {
         runOcrFromFile(imageFile);
     });
 
-    /* ---------- Popovers (options, more menu) ---------- */
+    /* ---------- Popovers (menus, display settings) ---------- */
     let openPopover = null;
 
     const positionPopover = () => {
@@ -1209,6 +1384,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const { popover, trigger } = openPopover;
+        if (!trigger.isConnected || !trigger.getClientRects().length) {
+            closePopover({ restoreFocus: false });
+            return;
+        }
         const asSheet = narrowScreen.matches;
         popover.classList.toggle('as-sheet', asSheet);
         popoverBackdrop.hidden = !asSheet;
@@ -1239,7 +1418,7 @@ document.addEventListener('DOMContentLoaded', () => {
         popover.hidden = true;
         popoverBackdrop.hidden = true;
         trigger.setAttribute('aria-expanded', 'false');
-        if (restoreFocus) {
+        if (restoreFocus && trigger.isConnected) {
             trigger.focus({ preventScroll: true });
         }
     };
@@ -1257,7 +1436,12 @@ document.addEventListener('DOMContentLoaded', () => {
         popover.querySelector('.menu-item:not([hidden]), .switch')?.focus({ preventScroll: true });
     };
 
-    optionsBtn.addEventListener('click', () => togglePopover(optionsPopover, optionsBtn));
+    let menuSlotId = null;
+    const openSlotMenu = (id, trigger) => {
+        menuSlotId = id;
+        togglePopover(slotMenu, trigger);
+    };
+
     moreBtn.addEventListener('click', () => togglePopover(moreMenu, moreBtn));
     $$('.js-popover-close').forEach((button) => button.addEventListener('click', () => closePopover()));
     popoverBackdrop.addEventListener('click', () => closePopover({ restoreFocus: false }));
@@ -1281,15 +1465,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('resize', positionPopover);
 
-    moreMenu.addEventListener('keydown', (event) => {
-        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+    [moreMenu, slotMenu].forEach((menu) => {
+        menu.addEventListener('keydown', (event) => {
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+                return;
+            }
+            event.preventDefault();
+            const items = Array.from(menu.querySelectorAll('.menu-item:not([hidden])'));
+            const index = items.indexOf(document.activeElement);
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            items[(index + step + items.length) % items.length]?.focus();
+        });
+    });
+
+    slotMenu.addEventListener('click', (event) => {
+        const item = event.target.closest('.menu-item');
+        if (!item) {
             return;
         }
-        event.preventDefault();
-        const items = $$('#more-menu .menu-item:not([hidden])');
-        const index = items.indexOf(document.activeElement);
-        const step = event.key === 'ArrowDown' ? 1 : -1;
-        items[(index + step + items.length) % items.length]?.focus();
+        const { action } = item.dataset;
+        const id = menuSlotId;
+        closePopover({ restoreFocus: false });
+        if (action === 'rename') {
+            startInlineRename(id);
+            return;
+        }
+        if (action === 'duplicate') {
+            duplicateSlot(id);
+        } else if (action === 'delete') {
+            deleteSlot(id);
+        }
+        // The menu is gone and the list re-rendered: keep keyboard focus in the list.
+        focusActiveItem();
     });
 
     moreMenu.addEventListener('click', (event) => {
@@ -1298,13 +1505,15 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const { action } = item.dataset;
-        closePopover({ restoreFocus: action !== 'rename' });
+        closePopover({ restoreFocus: action !== 'rename' && action !== 'display' });
         if (action === 'rename') {
             startRenameSlot();
         } else if (action === 'duplicate') {
-            duplicateActiveSlot();
+            duplicateSlot(activeSlotId);
         } else if (action === 'delete') {
-            deleteActiveSlot();
+            deleteSlot(activeSlotId);
+        } else if (action === 'display') {
+            togglePopover(displayPopover, moreBtn);
         } else if (action === 'fullscreen') {
             if (document.fullscreenElement) {
                 document.exitFullscreen();
@@ -1314,9 +1523,198 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    /* ---------- Option tooltips ---------- */
+    let tooltipAnchor = null;
+    let tooltipHideTimer = 0;
+
+    const hideTooltip = () => {
+        clearTimeout(tooltipHideTimer);
+        if (!tooltipAnchor) {
+            return;
+        }
+        tooltipAnchor.removeAttribute('aria-describedby');
+        tooltipAnchor = null;
+        tooltip.hidden = true;
+    };
+
+    // A short grace period lets the mouse travel from ⓘ onto the bubble (WCAG 1.4.13).
+    const hideTooltipSoon = () => {
+        clearTimeout(tooltipHideTimer);
+        tooltipHideTimer = setTimeout(hideTooltip, 150);
+    };
+
+    const showTooltip = (anchor) => {
+        clearTimeout(tooltipHideTimer);
+        tooltipAnchor?.removeAttribute('aria-describedby');
+        tooltipAnchor = anchor;
+        anchor.setAttribute('aria-describedby', 'tooltip');
+        tooltip.textContent = anchor.dataset.tip;
+        // Measure from the corner: a leftover `left` would narrow the shrink-to-fit width.
+        tooltip.style.left = '0px';
+        tooltip.style.top = '0px';
+        tooltip.hidden = false;
+        const margin = 10;
+        const gap = 8;
+        const rect = anchor.getBoundingClientRect();
+        const width = tooltip.offsetWidth;
+        const height = tooltip.offsetHeight;
+        const left = Math.max(margin, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - margin));
+        const above = rect.top - height - gap >= margin;
+        tooltip.dataset.placement = above ? 'top' : 'bottom';
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${above ? rect.top - height - gap : rect.bottom + gap}px`;
+        tooltip.style.setProperty('--arrow-x', `${rect.left + rect.width / 2 - left}px`);
+    };
+
+    // Follow the ⓘ when the page moves (e.g. a phone keyboard closing); drop the bubble once ⓘ is gone.
+    const repositionTooltip = () => {
+        if (!tooltipAnchor) {
+            return;
+        }
+        const rect = tooltipAnchor.getBoundingClientRect();
+        if (!tooltipAnchor.getClientRects().length || rect.bottom < 0 || rect.top > window.innerHeight) {
+            hideTooltip();
+        } else {
+            showTooltip(tooltipAnchor);
+        }
+    };
+
+    $$('.opt-info').forEach((button, index) => {
+        // Keep each explanation readable by screen readers as the option's description, not only in the bubble.
+        const description = document.createElement('span');
+        description.id = `opt-desc-${index}`;
+        description.hidden = true;
+        description.textContent = button.dataset.tip;
+        button.after(description);
+        button.closest('.opt-chip').querySelector('input').setAttribute('aria-describedby', description.id);
+
+        // Hover only for a real mouse; touch gets compatibility mouse events that would fight the tap toggle.
+        button.addEventListener('pointerenter', (event) => {
+            if (event.pointerType === 'mouse') {
+                showTooltip(button);
+            }
+        });
+        button.addEventListener('pointerleave', (event) => {
+            if (event.pointerType === 'mouse') {
+                hideTooltipSoon();
+            }
+        });
+        button.addEventListener('focus', () => {
+            if (button.matches(':focus-visible')) {
+                showTooltip(button);
+            }
+        });
+        button.addEventListener('blur', () => {
+            if (!tooltip.matches(':hover')) {
+                hideTooltip();
+            }
+        });
+        // Touch has no hover: a tap opens the help and a second tap closes it.
+        button.addEventListener('click', () => {
+            if (tooltipAnchor === button && !finePointer.matches) {
+                hideTooltip();
+            } else {
+                showTooltip(button);
+            }
+        });
+    });
+
+    tooltip.addEventListener('pointerenter', () => clearTimeout(tooltipHideTimer));
+    tooltip.addEventListener('pointerleave', (event) => {
+        if (event.pointerType === 'mouse') {
+            hideTooltipSoon();
+        }
+    });
+
+    document.addEventListener('pointerdown', (event) => {
+        if (tooltipAnchor && !tooltipAnchor.contains(event.target) && !tooltip.contains(event.target)) {
+            hideTooltip();
+        }
+    }, true);
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            hideTooltip();
+        }
+    });
+    window.addEventListener('resize', repositionTooltip);
+    document.addEventListener('scroll', repositionTooltip, true);
+
+    /* ---------- Collapsing (settings card, input column, 刀 list) ---------- */
+    const collapseKeys = {
+        controls: 'pcr_timeline_collapse_controls',
+        input: 'pcr_timeline_collapse_input',
+        sidebar: 'pcr_timeline_collapse_sidebar',
+    };
+
+    const setButtonState = (button, expanded, expandedLabel, collapsedLabel) => {
+        const label = expanded ? expandedLabel : collapsedLabel;
+        button.setAttribute('aria-expanded', String(expanded));
+        button.setAttribute('aria-label', label);
+        button.title = label;
+    };
+
+    const setControlsCollapsed = (collapsed, persist = true) => {
+        controlsCard.classList.toggle('collapsed', collapsed);
+        setButtonState(controlsCollapseBtn, !collapsed, '摺疊設定', '展開設定');
+        if (persist) {
+            storage.set(collapseKeys.controls, collapsed);
+        }
+    };
+
+    const setInputCollapsed = (collapsed, persist = true) => {
+        app.classList.toggle('input-collapsed', collapsed);
+        setButtonState(inputCollapseBtn, !collapsed, '摺疊原始軸', '展開原始軸');
+        inputExpandBtn.setAttribute('aria-expanded', String(!collapsed));
+        if (persist) {
+            storage.set(collapseKeys.input, collapsed);
+        }
+    };
+
+    const setSidebarCollapsed = (collapsed, persist = true) => {
+        if (collapsed && openPopover?.popover === slotMenu) {
+            closePopover({ restoreFocus: false });
+        }
+        app.classList.toggle('sidebar-collapsed', collapsed);
+        sidebarCollapseBtn.setAttribute('aria-expanded', String(!collapsed));
+        sidebarExpandBtn.setAttribute('aria-expanded', String(!collapsed));
+        if (persist) {
+            storage.set(collapseKeys.sidebar, collapsed);
+        }
+    };
+
+    controlsCollapseBtn.addEventListener('click', () => {
+        setControlsCollapsed(!controlsCard.classList.contains('collapsed'));
+    });
+
+    inputCollapseBtn.addEventListener('click', () => {
+        setInputCollapsed(true);
+        inputExpandBtn.focus({ preventScroll: true });
+    });
+
+    inputExpandBtn.addEventListener('click', () => {
+        setInputCollapsed(false);
+        if (finePointer.matches) {
+            inputText.focus({ preventScroll: true });
+        } else {
+            inputCollapseBtn.focus({ preventScroll: true });
+        }
+    });
+
+    sidebarCollapseBtn.addEventListener('click', () => {
+        setSidebarCollapsed(true);
+        sidebarExpandBtn.focus({ preventScroll: true });
+    });
+
+    sidebarExpandBtn.addEventListener('click', () => {
+        setSidebarCollapsed(false);
+        if (wideScreen.matches) {
+            focusActiveItem();
+        }
+    });
+
     /* ---------- Options ---------- */
     const renderOptionsSummary = () => {
-        const pills = $$('#options-popover .switch[data-summary]')
+        const pills = $$('.shift-options input[data-summary]')
             .filter((checkbox) => checkbox.checked)
             .map((checkbox) => {
                 const pill = document.createElement('span');
@@ -1324,6 +1722,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 pill.textContent = checkbox.dataset.summary;
                 return pill;
             });
+        if (pills.length === 0) {
+            const empty = document.createElement('span');
+            empty.className = 'summary-empty';
+            empty.textContent = '未開啟選項';
+            pills.push(empty);
+        }
         optionsSummary.replaceChildren(...pills);
     };
 
@@ -1369,7 +1773,7 @@ document.addEventListener('DOMContentLoaded', () => {
         storage.set('pcr_timeline_wrap', e.target.checked);
     });
 
-    $$('#options-popover .switch[data-summary]').forEach((checkbox) => {
+    $$('.shift-options input[data-summary]').forEach((checkbox) => {
         checkbox.addEventListener('change', renderOptionsSummary);
     });
 
@@ -1455,6 +1859,10 @@ document.addEventListener('DOMContentLoaded', () => {
     wrapLinesCheckbox.checked = savedWrap === null ? true : savedWrap === 'true';
     applyWrapLines(wrapLinesCheckbox.checked);
     applyFontSize(storage.get('pcr_timeline_font_size'));
+
+    setControlsCollapsed(storage.get(collapseKeys.controls) === 'true', false);
+    setInputCollapsed(storage.get(collapseKeys.input) === 'true', false);
+    setSidebarCollapsed(storage.get(collapseKeys.sidebar) === 'true', false);
 
     if (!window.PPOCRv5) {
         ocrUploadBtn.title = '圖片辨識元件未載入';
