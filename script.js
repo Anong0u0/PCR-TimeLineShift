@@ -17,6 +17,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const ocrFileInput = document.getElementById('ocr-file-input');
     const ocrStatus = document.getElementById('ocr-status');
     const ocrDropOverlay = document.getElementById('ocr-drop-overlay');
+    const codeContent = document.querySelector('.code-content');
+    const slotTabs = document.getElementById('slot-tabs');
+    const slotAddBtn = document.getElementById('slot-add');
+    const slotRenameBtn = document.getElementById('slot-rename');
+    const slotDuplicateBtn = document.getElementById('slot-duplicate');
+    const slotDeleteBtn = document.getElementById('slot-delete');
 
     let remainingSeconds = 90;
     let strictMode = false;
@@ -29,6 +35,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let ocrProcessing = false;
     let ocrRecognizing = false;
     let dragDepth = 0;
+    let slots = [];
+    let activeSlotId = null;
+    const slotsKey = 'pcr_timeline_slots';
+    const activeSlotKey = 'pcr_timeline_active_slot';
     const highlightMarker = '󠉑'; // \ue0251
 
     const toHalfwidthDigits = (value) => value.replace(/[０-９]/g, (digit) =>
@@ -116,8 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     const applyOcrText = (text = '') => {
+        // Keep the current 刀 intact: OCR into a fresh slot unless the current one is empty.
+        if (inputText.value.trim()) {
+            insertSlot(createSlot(text));
+            return;
+        }
         inputText.value = text;
-        localStorage.setItem('pcr_timeline_input', text);
+        setActiveSlotText(text);
         processText();
     };
 
@@ -328,9 +343,274 @@ document.addEventListener('DOMContentLoaded', () => {
         processText();
     };
 
-    inputText.addEventListener('input', () => {
-        localStorage.setItem('pcr_timeline_input', inputText.value);
+    const createSlot = (text = '', name = '') => ({
+        id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        text,
+        updatedAt: Date.now(),
+    });
+    const getActiveSlot = () => slots.find((slot) => slot.id === activeSlotId);
+    const getSlotLabel = (slot) => {
+        if (slot.name) {
+            return slot.name;
+        }
+        const firstLine = slot.text.split('\n').map((line) => line.trim()).find(Boolean);
+        return firstLine ? firstLine.slice(0, 50) : '未命名';
+    };
+
+    const readSlots = () => {
+        try {
+            const parsed = JSON.parse(localStorage.getItem(slotsKey));
+            if (Array.isArray(parsed)) {
+                return parsed
+                    .filter((slot) => slot && typeof slot.id === 'string')
+                    .map((slot) => ({
+                        id: slot.id,
+                        name: typeof slot.name === 'string' ? slot.name : '',
+                        text: typeof slot.text === 'string' ? slot.text : '',
+                        updatedAt: Number(slot.updatedAt) || 0,
+                    }));
+            }
+        } catch (error) {
+            console.error('[slots] read failed:', error);
+        }
+        return [];
+    };
+
+    const saveSlots = () => {
+        try {
+            localStorage.setItem(slotsKey, JSON.stringify(slots));
+            localStorage.setItem(activeSlotKey, activeSlotId);
+            // Mirror the active slot so a page without slots still restores the last input.
+            localStorage.setItem('pcr_timeline_input', getActiveSlot()?.text ?? '');
+        } catch (error) {
+            console.error('[slots] save failed:', error);
+        }
+    };
+
+    const createSlotTab = (slot) => {
+        const tab = document.createElement('button');
+        const label = getSlotLabel(slot);
+        tab.type = 'button';
+        tab.className = 'slot-tab';
+        tab.dataset.slotId = slot.id;
+        tab.textContent = label;
+        tab.title = label;
+        if (slot.id === activeSlotId) {
+            tab.classList.add('active');
+            tab.setAttribute('aria-current', 'true');
+        }
+        return tab;
+    };
+
+    const scrollTabIntoView = (tab) => {
+        const margin = 8;
+        if (tab.offsetLeft < slotTabs.scrollLeft) {
+            slotTabs.scrollLeft = tab.offsetLeft - margin;
+        } else if (tab.offsetLeft + tab.offsetWidth > slotTabs.scrollLeft + slotTabs.clientWidth) {
+            slotTabs.scrollLeft = tab.offsetLeft + tab.offsetWidth - slotTabs.clientWidth + margin;
+        }
+    };
+
+    const renderSlotTabs = () => {
+        slotTabs.replaceChildren(...slots.map(createSlotTab));
+        const activeTab = slotTabs.querySelector('.slot-tab.active');
+        if (activeTab) {
+            scrollTabIntoView(activeTab);
+        }
+    };
+
+    const loadActiveSlot = () => {
+        inputText.value = getActiveSlot()?.text ?? '';
+        inputText.scrollTop = 0;
+        if (codeContent) {
+            codeContent.scrollTop = 0;
+        }
+        saveSlots();
+        renderSlotTabs();
         processText();
+    };
+
+    const setActiveSlotText = (text) => {
+        const slot = getActiveSlot();
+        if (!slot) {
+            return;
+        }
+        slot.text = text;
+        slot.updatedAt = Date.now();
+        saveSlots();
+        const activeTab = slotTabs.querySelector('.slot-tab.active');
+        if (activeTab) {
+            const label = getSlotLabel(slot);
+            activeTab.textContent = label;
+            activeTab.title = label;
+            scrollTabIntoView(activeTab);
+        }
+    };
+
+    const switchSlot = (id) => {
+        if (id === activeSlotId || !slots.some((slot) => slot.id === id)) {
+            return;
+        }
+        activeSlotId = id;
+        loadActiveSlot();
+    };
+
+    const insertSlot = (slot, index = slots.length) => {
+        slots.splice(index, 0, slot);
+        activeSlotId = slot.id;
+        loadActiveSlot();
+    };
+
+    const duplicateActiveSlot = () => {
+        const source = getActiveSlot();
+        if (!source) {
+            return;
+        }
+        insertSlot(createSlot(source.text, `${getSlotLabel(source)} 複本`), slots.indexOf(source) + 1);
+    };
+
+    const deleteActiveSlot = () => {
+        const slot = getActiveSlot();
+        if (!slot) {
+            return;
+        }
+        if (slot.text.trim() && !window.confirm(`確定要刪除「${getSlotLabel(slot)}」嗎？此動作無法復原。`)) {
+            return;
+        }
+        const index = slots.indexOf(slot);
+        slots.splice(index, 1);
+        if (slots.length === 0) {
+            slots.push(createSlot());
+        }
+        activeSlotId = slots[Math.min(index, slots.length - 1)].id;
+        loadActiveSlot();
+    };
+
+    const startRenameSlot = () => {
+        const slot = getActiveSlot();
+        const activeTab = slotTabs.querySelector('.slot-tab.active');
+        if (!slot || !activeTab) {
+            return;
+        }
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'slot-rename-input';
+        input.value = slot.name;
+        input.placeholder = getSlotLabel({ ...slot, name: '' });
+        input.maxLength = 50;
+        input.setAttribute('aria-label', '刀名稱（留空則使用第一行）');
+
+        let finished = false;
+        const finish = (shouldSave) => {
+            if (finished) {
+                return;
+            }
+            finished = true;
+            if (shouldSave) {
+                slot.name = input.value.trim();
+                slot.updatedAt = Date.now();
+                saveSlots();
+            }
+            if (input.isConnected) {
+                input.replaceWith(createSlotTab(slot));
+            }
+        };
+
+        input.addEventListener('keydown', (event) => {
+            if (event.isComposing || event.keyCode === 229) {
+                return;
+            }
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                finish(true);
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                finish(false);
+            }
+        });
+        input.addEventListener('blur', () => finish(true));
+
+        activeTab.replaceWith(input);
+        input.focus();
+        input.select();
+    };
+
+    const initSlots = () => {
+        slots = readSlots();
+        if (slots.length === 0) {
+            slots = [createSlot(localStorage.getItem('pcr_timeline_input') ?? '')];
+        }
+        const savedActiveId = localStorage.getItem(activeSlotKey);
+        activeSlotId = slots.some((slot) => slot.id === savedActiveId) ? savedActiveId : slots[0].id;
+        inputText.value = getActiveSlot().text;
+        saveSlots();
+        renderSlotTabs();
+    };
+
+    inputText.addEventListener('input', () => {
+        setActiveSlotText(inputText.value);
+        processText();
+    });
+
+    slotTabs.addEventListener('mousedown', (event) => {
+        const renameInput = slotTabs.querySelector('.slot-rename-input');
+        const tab = event.target.closest('.slot-tab');
+        if (!renameInput || !tab) {
+            return;
+        }
+        // Committing the rename resizes the tabs, so the click would miss: switch right away.
+        event.preventDefault();
+        renameInput.blur();
+        switchSlot(tab.dataset.slotId);
+    });
+
+    slotTabs.addEventListener('click', (event) => {
+        const tab = event.target.closest('.slot-tab');
+        if (tab) {
+            switchSlot(tab.dataset.slotId);
+        }
+    });
+
+    slotTabs.addEventListener('dblclick', (event) => {
+        if (event.target.closest('.slot-tab.active')) {
+            startRenameSlot();
+        }
+    });
+
+    slotAddBtn.addEventListener('click', () => {
+        insertSlot(createSlot());
+        if (inputPanel.classList.contains('collapsed')) {
+            inputHeaderToggle.click();
+        }
+        if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+            inputText.focus();
+        }
+    });
+
+    slotRenameBtn.addEventListener('click', startRenameSlot);
+    slotDuplicateBtn.addEventListener('click', duplicateActiveSlot);
+    slotDeleteBtn.addEventListener('click', deleteActiveSlot);
+
+    // Another tab saved its slots: adopt them so our next save doesn't overwrite theirs.
+    window.addEventListener('storage', (event) => {
+        if (event.key !== slotsKey) {
+            return;
+        }
+        const nextSlots = readSlots();
+        if (nextSlots.length === 0) {
+            return;
+        }
+        slots = nextSlots;
+        if (!getActiveSlot()) {
+            activeSlotId = slots[0].id;
+        }
+        const activeText = getActiveSlot().text;
+        if (inputText.value !== activeText) {
+            inputText.value = activeText;
+            processText();
+        }
+        renderSlotTabs();
     });
 
     document.addEventListener('paste', (event) => {
@@ -671,10 +951,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTheme(newTheme);
     });
 
-    const savedInput = localStorage.getItem('pcr_timeline_input');
-    if (savedInput !== null) {
-        inputText.value = savedInput;
-    }
+    initSlots();
 
     const savedSeconds = localStorage.getItem('pcr_timeline_seconds');
     if (savedSeconds !== null) {
