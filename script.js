@@ -1,28 +1,46 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const inputText = document.getElementById('input-text');
-    const outputCode = document.getElementById('output-code');
-    const secondsInput = document.getElementById('seconds-input');
-    const secondsSlider = document.getElementById('seconds-slider');
-    const btnMinus = document.getElementById('btn-minus');
-    const btnPlus = document.getElementById('btn-plus');
-    const strictModeCheckbox = document.getElementById('strict-mode');
-    const hideLowTimeCheckbox = document.getElementById('hide-low-time');
-    const ignoreCommentCheckbox = document.getElementById('ignore-comment');
-    const highlightTimeCheckbox = document.getElementById('highlight-time');
-    const copyBtn = document.getElementById('copy-btn');
-    const mainContent = document.querySelector('.main-content');
-    const btnContentDefault = copyBtn.querySelector('.default-state');
-    const btnContentCopied = copyBtn.querySelector('.copied-state');
-    const ocrUploadBtn = document.getElementById('ocr-upload-btn');
-    const ocrFileInput = document.getElementById('ocr-file-input');
-    const ocrStatus = document.getElementById('ocr-status');
-    const ocrDropOverlay = document.getElementById('ocr-drop-overlay');
-    const codeContent = document.querySelector('.code-content');
-    const slotTabs = document.getElementById('slot-tabs');
-    const slotAddBtn = document.getElementById('slot-add');
-    const slotRenameBtn = document.getElementById('slot-rename');
-    const slotDuplicateBtn = document.getElementById('slot-duplicate');
-    const slotDeleteBtn = document.getElementById('slot-delete');
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+    const app = $('#app');
+    const inputText = $('#input-text');
+    const outputCode = $('#output-code');
+    const outputEmpty = $('#output-empty');
+    const outputStats = $('#output-stats');
+    const outputTag = $('#output-tag');
+    const codeContent = $('.code-content');
+    const secondsInput = $('#seconds-input');
+    const secondsSlider = $('#seconds-slider');
+    const shiftDelta = $('#shift-delta');
+    const btnMinus = $('#btn-minus');
+    const btnPlus = $('#btn-plus');
+    const strictModeCheckbox = $('#strict-mode');
+    const hideLowTimeCheckbox = $('#hide-low-time');
+    const ignoreCommentCheckbox = $('#ignore-comment');
+    const highlightTimeCheckbox = $('#highlight-time');
+    const wrapLinesCheckbox = $('#wrap-lines');
+    const fontSizeGroup = $('#font-size-group');
+    const optionsBtn = $('#options-btn');
+    const optionsPopover = $('#options-popover');
+    const optionsSummary = $('#options-summary');
+    const moreBtn = $('#more-btn');
+    const moreMenu = $('#more-menu');
+    const popoverBackdrop = $('#popover-backdrop');
+    const toastRegion = $('#toast-region');
+    const ocrUploadBtn = $('#ocr-upload-btn');
+    const ocrFileInput = $('#ocr-file-input');
+    const ocrDropOverlay = $('#ocr-drop-overlay');
+    const slotList = $('#slot-list');
+    const slotCount = $('#slot-count');
+    const slotTitle = $('#slot-title');
+    const slotAddBtn = $('#slot-add');
+    const fullscreenToggle = $('#fullscreen-toggle');
+    const themeToggleBtn = $('#theme-toggle');
+    const themeColorMeta = $('meta[name="theme-color"]');
+    const copyButtons = $$('.js-copy');
+
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const narrowScreen = window.matchMedia('(max-width: 767px)');
 
     let remainingSeconds = 90;
     let strictMode = false;
@@ -37,10 +55,120 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragDepth = 0;
     let slots = [];
     let activeSlotId = null;
+    let placeholderSlotId = null;
     const slotsKey = 'pcr_timeline_slots';
     const activeSlotKey = 'pcr_timeline_active_slot';
-    const highlightMarker = '󠉑'; // \ue0251
+    const highlightMarker = '\u{E0251}';
+    const exampleTimeline = [
+        '範例：5王 物理刀',
+        '1:30 開場',
+        '1:18 UB 凱留',
+        '1:05 UB 鏡華 // 等貓劍出手',
+        '0:52 UB 凱留',
+        '0:31 UB 鏡華、凱留',
+        '0:12 UB 全員',
+    ].join('\n');
 
+    const storage = {
+        get: (key) => {
+            try {
+                return localStorage.getItem(key);
+            } catch (error) {
+                return null;
+            }
+        },
+        set: (key, value) => {
+            try {
+                localStorage.setItem(key, value);
+            } catch (error) {
+                console.error('[storage] save failed:', error);
+            }
+        },
+    };
+
+    const createIcon = (id) => {
+        const svgNs = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNs, 'svg');
+        const use = document.createElementNS(svgNs, 'use');
+        svg.setAttribute('class', 'icon');
+        svg.setAttribute('aria-hidden', 'true');
+        use.setAttribute('href', `#${id}`);
+        svg.append(use);
+        return svg;
+    };
+
+    /* ---------- Toasts ---------- */
+    const toastsById = new Map();
+    const toastModeIcons = { 'is-ready': 'i-check', 'is-error': 'i-x' };
+
+    const dismissToast = (toast) => {
+        if (!toast || toast.el.classList.contains('leaving')) {
+            return;
+        }
+        clearTimeout(toast.timer);
+        if (toast.id && toastsById.get(toast.id) === toast) {
+            toastsById.delete(toast.id);
+        }
+        toast.el.classList.add('leaving');
+        setTimeout(() => toast.el.remove(), 180);
+    };
+
+    const showToast = (message, { id = '', mode = '', action = null, timeout = 4000 } = {}) => {
+        let toast = id ? toastsById.get(id) : null;
+        if (!toast) {
+            const el = document.createElement('div');
+            el.className = 'toast';
+            const icon = document.createElement('span');
+            icon.className = 'toast-icon';
+            const text = document.createElement('span');
+            text.className = 'toast-text';
+            const actionBtn = document.createElement('button');
+            actionBtn.type = 'button';
+            actionBtn.className = 'toast-action';
+            el.append(icon, text, actionBtn);
+            toast = { id, el, icon, text, actionBtn, timer: null };
+            el.toast = toast;
+            if (id) {
+                toastsById.set(id, toast);
+            }
+            toastRegion.append(el);
+            const live = Array.from(toastRegion.children).filter((child) => !child.classList.contains('leaving'));
+            if (live.length > 3) {
+                dismissToast(live[0].toast);
+            }
+        }
+
+        toast.el.dataset.mode = mode;
+        toast.text.textContent = message;
+        if (mode === 'is-loading') {
+            const spinner = document.createElement('span');
+            spinner.className = 'spinner';
+            toast.icon.replaceChildren(spinner);
+        } else if (toastModeIcons[mode]) {
+            toast.icon.replaceChildren(createIcon(toastModeIcons[mode]));
+        } else {
+            toast.icon.replaceChildren();
+        }
+        toast.icon.hidden = !toast.icon.firstChild;
+
+        toast.actionBtn.hidden = !action;
+        toast.actionBtn.onclick = null;
+        if (action) {
+            toast.actionBtn.textContent = action.label;
+            toast.actionBtn.onclick = () => {
+                dismissToast(toast);
+                action.onClick();
+            };
+        }
+
+        clearTimeout(toast.timer);
+        if (timeout) {
+            toast.timer = setTimeout(() => dismissToast(toast), timeout);
+        }
+        return toast;
+    };
+
+    /* ---------- Time shift ---------- */
     const toHalfwidthDigits = (value) => value.replace(/[０-９]/g, (digit) =>
         String.fromCharCode(digit.charCodeAt(0) - 0xFF10 + 0x30));
     const toFullwidthDigits = (value) => value.replace(/\d/g, (digit) =>
@@ -56,155 +184,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const wrapHighlightMarker = (value) => highlightTime
         ? `${highlightMarker}${value}${highlightMarker}`
         : value;
-    const ocrStatusModes = ['is-loading', 'is-ready', 'is-error'];
-    const setOcrStatus = (message = '', mode = '') => {
-        if (!ocrStatus) {
-            return;
-        }
-        ocrStatus.textContent = message;
-        ocrStatus.classList.remove(...ocrStatusModes);
-        if (mode) {
-            ocrStatus.classList.add(mode);
-        }
-    };
-    const setIdleOcrStatus = (message, mode) => {
-        if (!ocrRecognizing) {
-            setOcrStatus(message, mode);
-        }
-    };
-    const getErrorMessage = (error) => error?.message || String(error);
-    const setOcrError = (prefix, error) => setOcrStatus(`${prefix}: ${getErrorMessage(error)}`, 'is-error');
-    const toPercentText = (value) => `${Math.max(0, Math.min(100, Math.round(Number(value) || 0)))}%`;
-    const resolveOcrProgressStatus = (progress) => {
-        const failText = `OCR 初始化失敗: ${progress.message || 'unknown error'}`;
-        const unified = progress.progress;
-        if (unified) {
-            if (unified.state === 'failed' || progress.state === 'failed' || progress.phase === 'error') {
-                return ['OCR 失敗: ' + (progress.message || 'unknown error'), 'is-error'];
-            }
-            if (unified.kind === 'recognize') {
-                return unified.state === 'done'
-                    ? ['OCR 辨識完成', 'is-ready']
-                    : [`OCR 辨識中 ${toPercentText(unified.percent)}`, 'is-loading'];
-            }
-            if (unified.kind === 'init') {
-                return (unified.percent >= 100 || (progress.phase === 'ready' && progress.state === 'done'))
-                    ? ['OCR 已就緒', 'is-ready']
-                    : [`OCR 初始化中 ${toPercentText(unified.percent)}`, 'is-loading'];
-            }
-        }
-        if (progress.phase === 'download' && progress.download?.overall) {
-            return [`OCR 初始化中 ${toPercentText(progress.download.overall.percent)}`, 'is-loading'];
-        }
-        if (progress.phase === 'warmup' && progress.warmup?.total) {
-            return [`OCR 暖機 ${progress.warmup.current}/${progress.warmup.total}`, 'is-loading'];
-        }
-        if (progress.phase === 'ready' && progress.state === 'done') {
-            return ['OCR 已就緒', 'is-ready'];
-        }
-        if (progress.phase === 'error' || progress.state === 'failed') {
-            return [failText, 'is-error'];
-        }
-        if (progress.state === 'loading' || progress.state === 'creating' || progress.state === 'running') {
-            return ['OCR 初始化中...', 'is-loading'];
-        }
-        return null;
-    };
-    const isImageFile = (file) => Boolean(file?.type?.startsWith('image/'));
-    const getFirstImageFile = (files) => Array.from(files || []).find(isImageFile) || null;
-    const getClipboardImageFile = (clipboardData) => {
-        if (!clipboardData) {
-            return null;
-        }
-        const fileFromFiles = getFirstImageFile(clipboardData.files);
-        return fileFromFiles || null;
-    };
-    const dragHasFiles = (event) => Array.from(event?.dataTransfer?.types || []).includes('Files');
-    const setDropOverlayVisible = (visible) => {
-        if (ocrDropOverlay) {
-            ocrDropOverlay.classList.toggle('visible', visible);
-        }
-    };
-    const applyOcrText = (text = '') => {
-        // Keep the current 刀 intact: OCR into a fresh slot unless the current one is empty.
-        if (inputText.value.trim()) {
-            insertSlot(createSlot(text));
-            return;
-        }
-        inputText.value = text;
-        setActiveSlotText(text);
-        processText();
-    };
 
-    const renderOcrProgress = (progress) => {
-        if (!progress) {
+    const renderStats = ({ hasInput, shiftedCount, hiddenCount, warningShown }) => {
+        if (!hasInput) {
+            outputStats.replaceChildren();
             return;
         }
-
-        const nextStatus = resolveOcrProgressStatus(progress);
-        if (nextStatus) {
-            setOcrStatus(nextStatus[0], nextStatus[1]);
+        const createStat = (parts, warn = false) => {
+            const stat = document.createElement('span');
+            stat.className = warn ? 'stat stat-warn' : 'stat';
+            if (warn) {
+                const dot = document.createElement('span');
+                dot.className = 'stat-dot';
+                stat.append(dot);
+            }
+            parts.forEach((part) => {
+                if (typeof part === 'number') {
+                    const value = document.createElement('b');
+                    value.textContent = part;
+                    stat.append(value);
+                } else {
+                    stat.append(part);
+                }
+            });
+            return stat;
+        };
+        const stats = [createStat(['換算 ', shiftedCount, ' 個時間'])];
+        if (hiddenCount > 0) {
+            stats.push(createStat(['隱藏 ', hiddenCount, ' 行（補償時間不足）'], true));
         }
-    };
-    const startOcrInitInBackground = () => {
-        if (!window.PPOCRv5) {
-            setOcrStatus('OCR plugin 未載入', 'is-error');
-            return null;
+        if (warningShown) {
+            stats.push(createStat(['有軸補償時間不足'], true));
         }
-        if (!ocrInitProgressUnsub) {
-            ocrInitProgressUnsub = window.PPOCRv5.onInitProgress(renderOcrProgress);
-        }
-        if (ocrEngine) {
-            setIdleOcrStatus('OCR 已就緒', 'is-ready');
-            return Promise.resolve(ocrEngine);
-        }
-        if (!ocrInitPromise) {
-            setIdleOcrStatus('OCR 初始化中...', 'is-loading');
-            ocrInitPromise = window.PPOCRv5.init()
-                .then((engine) => {
-                    ocrEngine = engine;
-                    setIdleOcrStatus('OCR 已就緒', 'is-ready');
-                    return engine;
-                })
-                .catch((error) => {
-                    ocrInitPromise = null;
-                    ocrEngine = null;
-                    setOcrError('OCR 初始化失敗', error);
-                    throw error;
-                });
-        }
-        return ocrInitPromise;
-    };
-    const ensureOcrEngine = async () => {
-        const initPromise = startOcrInitInBackground();
-        if (!initPromise) {
-            throw new Error('PPOCRv5 plugin not loaded');
-        }
-        return await initPromise;
-    };
-    const runOcrFromFile = async (file) => {
-        if (!isImageFile(file)) {
-            setOcrStatus('請選擇圖片檔', 'is-error');
-            return;
-        }
-        if (ocrProcessing) {
-            setOcrStatus('OCR 辨識中，請稍候', 'is-loading');
-            return;
-        }
-        ocrProcessing = true;
-        try {
-            const engine = await ensureOcrEngine();
-            ocrRecognizing = true;
-            setOcrStatus('OCR 辨識中...', 'is-loading');
-            const result = await engine.recognizeFile(file);
-            applyOcrText(result?.text || '');
-            setOcrStatus('OCR 辨識完成', 'is-ready');
-        } catch (error) {
-            setOcrError(ocrRecognizing ? 'OCR 辨識失敗' : 'OCR 初始化失敗', error);
-        } finally {
-            ocrRecognizing = false;
-            ocrProcessing = false;
-        }
+        outputStats.replaceChildren(...stats);
     };
 
     const processText = () => {
@@ -218,6 +230,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const processedLines = [];
         let warningShown = false;
         let shouldSkipFollowers = false;
+        let shiftedCount = 0;
+        let hiddenCount = 0;
 
         lines.forEach((line) => {
             if (/https?:\/\//.test(line)) {
@@ -294,9 +308,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (matchCount > 0) {
                 shouldSkipFollowers = lineHasLowTime && hideLowTime;
                 if (shouldSkipFollowers) {
+                    hiddenCount += line.trim() ? 1 : 0;
                     return;
                 }
             } else if (shouldSkipFollowers) {
+                hiddenCount += line.trim() ? 1 : 0;
                 return;
             }
 
@@ -311,6 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 warningShown = true;
             }
 
+            shiftedCount += matchCount;
             processedLines.push(`${processedLine}${commentTail}`);
         });
 
@@ -329,6 +346,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     .join('');
             }
         }
+
+        const hasInput = text.trim() !== '';
+        outputEmpty.hidden = hasInput;
+        renderStats({ hasInput, shiftedCount, hiddenCount, warningShown });
+    };
+
+    /* ---------- Remaining seconds ---------- */
+    const renderSeconds = () => {
+        const offset = remainingSeconds - 90;
+        secondsSlider.style.setProperty('--pct', `${(remainingSeconds / 90) * 100}%`);
+        shiftDelta.textContent = offset === 0 ? '不需平移' : `所有時間 −${-offset} 秒`;
+        shiftDelta.classList.toggle('is-zero', offset === 0);
+        outputTag.textContent = `${remainingSeconds} 秒`;
     };
 
     const updateState = (newVal) => {
@@ -338,11 +368,68 @@ document.addEventListener('DOMContentLoaded', () => {
         secondsInput.value = val;
         secondsSlider.value = val;
 
-        localStorage.setItem('pcr_timeline_seconds', val);
+        storage.set('pcr_timeline_seconds', val);
 
+        renderSeconds();
         processText();
     };
 
+    const bindHoldRepeat = (button, step) => {
+        let delayTimer = null;
+        let repeatTimer = null;
+        const stop = () => {
+            clearTimeout(delayTimer);
+            clearInterval(repeatTimer);
+            delayTimer = null;
+            repeatTimer = null;
+        };
+        button.addEventListener('pointerdown', (event) => {
+            if (event.button !== 0) {
+                return;
+            }
+            event.preventDefault();
+            stop();
+            step();
+            delayTimer = setTimeout(() => {
+                repeatTimer = setInterval(step, 60);
+            }, 380);
+        });
+        ['pointerup', 'pointerleave', 'pointercancel'].forEach((type) => button.addEventListener(type, stop));
+        window.addEventListener('blur', stop);
+        // Keyboard activation has no pointer events.
+        button.addEventListener('click', (event) => {
+            if (event.detail === 0) {
+                step();
+            }
+        });
+        button.addEventListener('contextmenu', (event) => event.preventDefault());
+    };
+
+    bindHoldRepeat(btnMinus, () => updateState(remainingSeconds - 1));
+    bindHoldRepeat(btnPlus, () => updateState(remainingSeconds + 1));
+
+    secondsInput.addEventListener('input', (e) => {
+        let val = parseInt(e.target.value);
+        if (!isNaN(val)) {
+            updateState(val);
+        }
+    });
+    secondsInput.addEventListener('focus', () => secondsInput.select());
+    secondsInput.addEventListener('blur', () => {
+        secondsInput.value = remainingSeconds;
+    });
+    secondsInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            secondsInput.blur();
+        }
+    });
+
+    secondsSlider.addEventListener('input', (e) => {
+        let val = parseInt(e.target.value);
+        updateState(val);
+    });
+
+    /* ---------- Slots (記憶管理) ---------- */
     const createSlot = (text = '', name = '') => ({
         id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
         name,
@@ -351,11 +438,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const getActiveSlot = () => slots.find((slot) => slot.id === activeSlotId);
     const getSlotLabel = (slot) => {
-        if (slot.name) {
-            return slot.name;
+        const name = slot.name.trim();
+        if (name) {
+            return name;
         }
         const firstLine = slot.text.split('\n').map((line) => line.trim()).find(Boolean);
         return firstLine ? firstLine.slice(0, 50) : '未命名';
+    };
+    const formatUpdatedAt = (timestamp) => {
+        if (!timestamp) {
+            return '';
+        }
+        const date = new Date(timestamp);
+        const pad = (value) => String(value).padStart(2, '0');
+        const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        return date.toDateString() === new Date().toDateString()
+            ? time
+            : `${date.getMonth() + 1}/${date.getDate()} ${time}`;
+    };
+    const getSlotMeta = (slot) => {
+        const lineCount = slot.text.split('\n').filter((line) => line.trim()).length;
+        return [lineCount ? `${lineCount} 行` : '空白', formatUpdatedAt(slot.updatedAt)]
+            .filter(Boolean)
+            .join(' · ');
     };
 
     const readSlots = () => {
@@ -388,46 +493,111 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const createSlotTab = (slot) => {
-        const tab = document.createElement('button');
+    const fillSlotItem = (item, slot) => {
         const label = getSlotLabel(slot);
-        tab.type = 'button';
-        tab.className = 'slot-tab';
-        tab.dataset.slotId = slot.id;
-        tab.textContent = label;
-        tab.title = label;
-        if (slot.id === activeSlotId) {
-            tab.classList.add('active');
-            tab.setAttribute('aria-current', 'true');
-        }
-        return tab;
+        item.querySelector('.slot-name').textContent = label;
+        item.querySelector('.slot-meta').textContent = getSlotMeta(slot);
+        item.title = label;
     };
 
-    const scrollTabIntoView = (tab) => {
+    const createSlotItem = (slot) => {
+        const item = document.createElement('button');
+        const name = document.createElement('span');
+        const meta = document.createElement('span');
+        item.type = 'button';
+        item.className = 'slot-item';
+        item.dataset.slotId = slot.id;
+        name.className = 'slot-name';
+        meta.className = 'slot-meta';
+        item.append(name, meta);
+        fillSlotItem(item, slot);
+        const isActive = slot.id === activeSlotId;
+        item.classList.toggle('active', isActive);
+        item.tabIndex = isActive ? 0 : -1;
+        if (isActive) {
+            item.setAttribute('aria-current', 'true');
+        }
+        return item;
+    };
+
+    const scrollItemIntoView = (item) => {
         const margin = 8;
-        if (tab.offsetLeft < slotTabs.scrollLeft) {
-            slotTabs.scrollLeft = tab.offsetLeft - margin;
-        } else if (tab.offsetLeft + tab.offsetWidth > slotTabs.scrollLeft + slotTabs.clientWidth) {
-            slotTabs.scrollLeft = tab.offsetLeft + tab.offsetWidth - slotTabs.clientWidth + margin;
+        if (slotList.scrollWidth > slotList.clientWidth) {
+            if (item.offsetLeft < slotList.scrollLeft) {
+                slotList.scrollLeft = item.offsetLeft - margin;
+            } else if (item.offsetLeft + item.offsetWidth > slotList.scrollLeft + slotList.clientWidth) {
+                slotList.scrollLeft = item.offsetLeft + item.offsetWidth - slotList.clientWidth + margin;
+            }
+        }
+        if (slotList.scrollHeight > slotList.clientHeight) {
+            if (item.offsetTop < slotList.scrollTop) {
+                slotList.scrollTop = item.offsetTop - margin;
+            } else if (item.offsetTop + item.offsetHeight > slotList.scrollTop + slotList.clientHeight) {
+                slotList.scrollTop = item.offsetTop + item.offsetHeight - slotList.clientHeight + margin;
+            }
         }
     };
 
-    const renderSlotTabs = () => {
-        slotTabs.replaceChildren(...slots.map(createSlotTab));
-        const activeTab = slotTabs.querySelector('.slot-tab.active');
-        if (activeTab) {
-            scrollTabIntoView(activeTab);
+    const getActiveItem = () => slotList.querySelector('.slot-item.active');
+
+    const updateScrollHint = () => {
+        const hasMoreRight = slotList.scrollLeft + slotList.clientWidth < slotList.scrollWidth - 2;
+        slotList.classList.toggle('can-scroll-right', hasMoreRight);
+    };
+
+    const renderSlotList = () => {
+        const hadFocus = slotList.contains(document.activeElement);
+        slotList.replaceChildren(...slots.map(createSlotItem));
+        slotCount.textContent = slots.length;
+        const activeItem = getActiveItem();
+        if (activeItem) {
+            scrollItemIntoView(activeItem);
+            if (hadFocus) {
+                activeItem.focus({ preventScroll: true });
+            }
         }
+        updateScrollHint();
+    };
+
+    const renderTitle = () => {
+        const slot = getActiveSlot();
+        if (!slot) {
+            return;
+        }
+        if (document.activeElement !== slotTitle) {
+            slotTitle.value = slot.name;
+        }
+        slotTitle.placeholder = getSlotLabel({ ...slot, name: '' });
+    };
+
+    const updateActiveSlotItem = () => {
+        const slot = getActiveSlot();
+        const activeItem = getActiveItem();
+        if (slot && activeItem) {
+            fillSlotItem(activeItem, slot);
+            scrollItemIntoView(activeItem);
+            updateScrollHint();
+        }
+    };
+
+    const setView = (view) => {
+        app.dataset.view = view;
+        $$('.view-switch .seg-btn').forEach((button) => {
+            button.setAttribute('aria-selected', String(button.dataset.view === view));
+        });
     };
 
     const loadActiveSlot = () => {
-        inputText.value = getActiveSlot()?.text ?? '';
+        const text = getActiveSlot()?.text ?? '';
+        inputText.value = text;
         inputText.scrollTop = 0;
-        if (codeContent) {
-            codeContent.scrollTop = 0;
+        codeContent.scrollTop = 0;
+        if (!text.trim()) {
+            setView('input');
         }
         saveSlots();
-        renderSlotTabs();
+        renderSlotList();
+        renderTitle();
         processText();
     };
 
@@ -439,13 +609,14 @@ document.addEventListener('DOMContentLoaded', () => {
         slot.text = text;
         slot.updatedAt = Date.now();
         saveSlots();
-        const activeTab = slotTabs.querySelector('.slot-tab.active');
-        if (activeTab) {
-            const label = getSlotLabel(slot);
-            activeTab.textContent = label;
-            activeTab.title = label;
-            scrollTabIntoView(activeTab);
-        }
+        updateActiveSlotItem();
+        renderTitle();
+    };
+
+    const setInputText = (text) => {
+        inputText.value = text;
+        setActiveSlotText(text);
+        processText();
     };
 
     const switchSlot = (id) => {
@@ -462,12 +633,32 @@ document.addEventListener('DOMContentLoaded', () => {
         loadActiveSlot();
     };
 
+    const addSlot = () => {
+        insertSlot(createSlot());
+        if (finePointer.matches) {
+            inputText.focus();
+        }
+    };
+
     const duplicateActiveSlot = () => {
         const source = getActiveSlot();
         if (!source) {
             return;
         }
         insertSlot(createSlot(source.text, `${getSlotLabel(source)} 複本`), slots.indexOf(source) + 1);
+        showToast('已建立複本', { id: 'duplicate', mode: 'is-ready', timeout: 2500 });
+    };
+
+    const restoreSlot = (slot, index) => {
+        if (slots.some((item) => item.id === slot.id)) {
+            return;
+        }
+        const placeholder = slots.find((item) => item.id === placeholderSlotId);
+        if (placeholder && !placeholder.text && !placeholder.name) {
+            slots.splice(slots.indexOf(placeholder), 1);
+        }
+        placeholderSlotId = null;
+        insertSlot(slot, Math.min(index, slots.length));
     };
 
     const deleteActiveSlot = () => {
@@ -475,77 +666,84 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!slot) {
             return;
         }
-        if (slot.text.trim() && !window.confirm(`確定要刪除「${getSlotLabel(slot)}」嗎？此動作無法復原。`)) {
-            return;
-        }
         const index = slots.indexOf(slot);
         slots.splice(index, 1);
+        placeholderSlotId = null;
         if (slots.length === 0) {
-            slots.push(createSlot());
+            const blank = createSlot();
+            slots.push(blank);
+            placeholderSlotId = blank.id;
         }
         activeSlotId = slots[Math.min(index, slots.length - 1)].id;
         loadActiveSlot();
+        if (slot.text.trim() || slot.name.trim()) {
+            showToast(`已刪除「${getSlotLabel(slot)}」`, {
+                id: 'slot-delete',
+                timeout: 8000,
+                action: { label: '復原', onClick: () => restoreSlot(slot, index) },
+            });
+        }
     };
 
     const startRenameSlot = () => {
+        slotTitle.focus();
+        slotTitle.select();
+    };
+
+    const clearActiveSlotText = () => {
         const slot = getActiveSlot();
-        const activeTab = slotTabs.querySelector('.slot-tab.active');
-        if (!slot || !activeTab) {
+        if (!slot || !inputText.value) {
             return;
         }
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'slot-rename-input';
-        input.value = slot.name;
-        input.placeholder = getSlotLabel({ ...slot, name: '' });
-        input.maxLength = 50;
-        input.setAttribute('aria-label', '刀名稱（留空則使用第一行）');
-
-        let finished = false;
-        const finish = (shouldSave) => {
-            if (finished) {
-                return;
-            }
-            finished = true;
-            if (shouldSave) {
-                slot.name = input.value.trim();
-                slot.updatedAt = Date.now();
-                saveSlots();
-            }
-            if (input.isConnected) {
-                input.replaceWith(createSlotTab(slot));
-            }
-        };
-
-        input.addEventListener('keydown', (event) => {
-            if (event.isComposing || event.keyCode === 229) {
-                return;
-            }
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                finish(true);
-            } else if (event.key === 'Escape') {
-                event.preventDefault();
-                finish(false);
-            }
+        const previous = inputText.value;
+        const slotId = slot.id;
+        setInputText('');
+        setView('input');
+        showToast('已清空原始軸', {
+            id: 'clear',
+            timeout: 8000,
+            action: {
+                label: '復原',
+                onClick: () => {
+                    const target = slots.find((item) => item.id === slotId);
+                    if (!target || target.text) {
+                        return;
+                    }
+                    if (activeSlotId !== slotId) {
+                        switchSlot(slotId);
+                    }
+                    setInputText(previous);
+                },
+            },
         });
-        input.addEventListener('blur', () => finish(true));
+        if (finePointer.matches) {
+            inputText.focus();
+        }
+    };
 
-        activeTab.replaceWith(input);
-        input.focus();
-        input.select();
+    // Keep the current 刀 intact: incoming text goes to a fresh slot unless the current one is empty.
+    const applyIncomingText = (text = '') => {
+        const normalized = text.replace(/\r\n?/g, '\n');
+        if (inputText.value.trim()) {
+            insertSlot(createSlot(normalized));
+            return true;
+        }
+        setInputText(normalized);
+        return false;
     };
 
     const initSlots = () => {
         slots = readSlots();
         if (slots.length === 0) {
-            slots = [createSlot(localStorage.getItem('pcr_timeline_input') ?? '')];
+            slots = [createSlot(storage.get('pcr_timeline_input') ?? '')];
         }
-        const savedActiveId = localStorage.getItem(activeSlotKey);
+        const savedActiveId = storage.get(activeSlotKey);
         activeSlotId = slots.some((slot) => slot.id === savedActiveId) ? savedActiveId : slots[0].id;
         inputText.value = getActiveSlot().text;
         saveSlots();
-        renderSlotTabs();
+        renderSlotList();
+        renderTitle();
+        setView(inputText.value.trim() ? 'output' : 'input');
     };
 
     inputText.addEventListener('input', () => {
@@ -553,44 +751,84 @@ document.addEventListener('DOMContentLoaded', () => {
         processText();
     });
 
-    slotTabs.addEventListener('mousedown', (event) => {
-        const renameInput = slotTabs.querySelector('.slot-rename-input');
-        const tab = event.target.closest('.slot-tab');
-        if (!renameInput || !tab) {
-            return;
-        }
-        // Committing the rename resizes the tabs, so the click would miss: switch right away.
-        event.preventDefault();
-        renameInput.blur();
-        switchSlot(tab.dataset.slotId);
-    });
-
-    slotTabs.addEventListener('click', (event) => {
-        const tab = event.target.closest('.slot-tab');
-        if (tab) {
-            switchSlot(tab.dataset.slotId);
+    slotList.addEventListener('click', (event) => {
+        const item = event.target.closest('.slot-item');
+        if (item) {
+            switchSlot(item.dataset.slotId);
         }
     });
 
-    slotTabs.addEventListener('dblclick', (event) => {
-        if (event.target.closest('.slot-tab.active')) {
+    slotList.addEventListener('dblclick', (event) => {
+        const item = event.target.closest('.slot-item');
+        if (item && item.dataset.slotId === activeSlotId) {
             startRenameSlot();
         }
     });
 
-    slotAddBtn.addEventListener('click', () => {
-        insertSlot(createSlot());
-        if (inputPanel.classList.contains('collapsed')) {
-            inputHeaderToggle.click();
+    slotList.addEventListener('keydown', (event) => {
+        const steps = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+        if (event.key === 'Home' || event.key === 'End') {
+            event.preventDefault();
+            switchSlot(slots[event.key === 'Home' ? 0 : slots.length - 1].id);
+            getActiveItem()?.focus();
+            return;
         }
-        if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-            inputText.focus();
+        if (!(event.key in steps)) {
+            return;
         }
+        event.preventDefault();
+        const index = slots.findIndex((slot) => slot.id === activeSlotId);
+        const next = slots[Math.max(0, Math.min(slots.length - 1, index + steps[event.key]))];
+        switchSlot(next.id);
+        getActiveItem()?.focus();
     });
 
-    slotRenameBtn.addEventListener('click', startRenameSlot);
-    slotDuplicateBtn.addEventListener('click', duplicateActiveSlot);
-    slotDeleteBtn.addEventListener('click', deleteActiveSlot);
+    slotAddBtn.addEventListener('click', addSlot);
+    slotList.addEventListener('scroll', updateScrollHint, { passive: true });
+    window.addEventListener('resize', updateScrollHint);
+
+    let titleBeforeEdit = '';
+    slotTitle.addEventListener('focus', () => {
+        titleBeforeEdit = getActiveSlot()?.name ?? '';
+    });
+    slotTitle.addEventListener('input', () => {
+        const slot = getActiveSlot();
+        if (!slot) {
+            return;
+        }
+        slot.name = slotTitle.value;
+        slot.updatedAt = Date.now();
+        saveSlots();
+        updateActiveSlotItem();
+    });
+    slotTitle.addEventListener('keydown', (event) => {
+        if (event.isComposing || event.keyCode === 229) {
+            return;
+        }
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            slotTitle.blur();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            slotTitle.value = titleBeforeEdit;
+            slotTitle.dispatchEvent(new Event('input'));
+            slotTitle.blur();
+        }
+    });
+    slotTitle.addEventListener('blur', () => {
+        const slot = getActiveSlot();
+        if (!slot) {
+            return;
+        }
+        const trimmed = slot.name.trim();
+        if (trimmed !== slot.name) {
+            slot.name = trimmed;
+            saveSlots();
+        }
+        slotTitle.value = slot.name;
+        updateActiveSlotItem();
+    });
 
     // Another tab saved its slots: adopt them so our next save doesn't overwrite theirs.
     window.addEventListener('storage', (event) => {
@@ -610,40 +848,301 @@ document.addEventListener('DOMContentLoaded', () => {
             inputText.value = activeText;
             processText();
         }
-        renderSlotTabs();
+        renderSlotList();
+        renderTitle();
     });
+
+    /* ---------- View switch (narrow screens) ---------- */
+    $$('.view-switch .seg-btn').forEach((button) => {
+        button.addEventListener('click', () => setView(button.dataset.view));
+    });
+
+    /* ---------- Copy / paste / clear ---------- */
+    copyButtons.forEach((button) => {
+        const label = button.querySelector('.copy-label');
+        button.dataset.label = label.textContent;
+    });
+    let copyResetTimer = null;
+    const showCopyState = () => {
+        copyButtons.forEach((button) => {
+            button.classList.add('copied');
+            button.querySelector('.copy-label').textContent = '已複製';
+        });
+        clearTimeout(copyResetTimer);
+        copyResetTimer = setTimeout(() => {
+            copyButtons.forEach((button) => {
+                button.classList.remove('copied');
+                button.querySelector('.copy-label').textContent = button.dataset.label;
+            });
+        }, 2000);
+    };
+
+    const fallbackCopy = (text) => {
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        temp.setAttribute('readonly', '');
+        temp.style.position = 'absolute';
+        temp.style.left = '-9999px';
+        document.body.appendChild(temp);
+        temp.select();
+        try {
+            const ok = document.execCommand('copy');
+            if (ok) {
+                showCopyState();
+            } else {
+                showToast('複製失敗，請手動選取文字', { mode: 'is-error' });
+            }
+        } finally {
+            document.body.removeChild(temp);
+        }
+    };
+
+    const copyOutput = () => {
+        const text = outputCode.textContent;
+        if (!text.trim()) {
+            showToast('還沒有可以複製的結果', { id: 'copy', timeout: 2500 });
+            return;
+        }
+        if (navigator?.clipboard?.writeText) {
+            navigator.clipboard.writeText(text)
+                .then(showCopyState)
+                .catch(() => fallbackCopy(text));
+            return;
+        }
+        fallbackCopy(text);
+    };
+
+    const pasteText = (text) => {
+        if (!text.trim()) {
+            showToast('剪貼簿裡沒有文字或圖片', { id: 'paste', timeout: 3000 });
+            return;
+        }
+        const createdNew = applyIncomingText(text);
+        showToast(createdNew ? '已貼上，另存成新的一刀' : '已貼上', { id: 'paste', mode: 'is-ready', timeout: 2500 });
+        setView('output');
+    };
+
+    const pasteFromClipboard = async () => {
+        const clipboard = navigator.clipboard;
+        try {
+            if (clipboard?.read) {
+                const items = await clipboard.read();
+                for (const item of items) {
+                    const imageType = item.types.find((type) => type.startsWith('image/'));
+                    if (imageType) {
+                        const blob = await item.getType(imageType);
+                        runOcrFromFile(new File([blob], 'clipboard-image', { type: imageType }));
+                        return;
+                    }
+                }
+                const textItem = items.find((item) => item.types.includes('text/plain'));
+                pasteText(textItem ? await (await textItem.getType('text/plain')).text() : '');
+                return;
+            }
+            if (clipboard?.readText) {
+                pasteText(await clipboard.readText());
+                return;
+            }
+            throw new Error('Clipboard API unavailable');
+        } catch (error) {
+            console.warn('[paste] clipboard read failed:', error);
+            setView('input');
+            showToast('無法讀取剪貼簿，請在輸入框長按或按 Ctrl+V 貼上', { id: 'paste', mode: 'is-error', timeout: 5000 });
+        }
+    };
+
+    copyButtons.forEach((button) => button.addEventListener('click', copyOutput));
+    $$('.js-paste').forEach((button) => button.addEventListener('click', pasteFromClipboard));
+    $$('.js-clear').forEach((button) => button.addEventListener('click', clearActiveSlotText));
+
+    $('#load-example').addEventListener('click', () => {
+        applyIncomingText(exampleTimeline);
+        setView('output');
+    });
+
+    /* ---------- OCR ---------- */
+    const setOcrStatus = (message = '', mode = '') => {
+        const busy = mode === 'is-loading';
+        ocrUploadBtn.classList.toggle('is-busy', busy);
+        ocrUploadBtn.setAttribute('aria-busy', String(busy));
+        if (!message) {
+            dismissToast(toastsById.get('ocr'));
+            return;
+        }
+        const timeout = { 'is-loading': 0, 'is-error': 7000 }[mode] ?? 2500;
+        showToast(message, { id: 'ocr', mode, timeout });
+    };
+    const setIdleOcrStatus = (message, mode) => {
+        if (!ocrRecognizing) {
+            setOcrStatus(message, mode);
+        }
+    };
+    const getErrorMessage = (error) => error?.message || String(error);
+    const setOcrError = (prefix, error) => setOcrStatus(`${prefix}: ${getErrorMessage(error)}`, 'is-error');
+    const toPercentText = (value) => `${Math.max(0, Math.min(100, Math.round(Number(value) || 0)))}%`;
+    const resolveOcrProgressStatus = (progress) => {
+        const failText = `辨識模型載入失敗: ${progress.message || 'unknown error'}`;
+        const unified = progress.progress;
+        if (unified) {
+            if (unified.state === 'failed' || progress.state === 'failed' || progress.phase === 'error') {
+                return ['圖片辨識失敗: ' + (progress.message || 'unknown error'), 'is-error'];
+            }
+            if (unified.kind === 'recognize') {
+                return unified.state === 'done'
+                    ? ['辨識完成', 'is-ready']
+                    : [`辨識中 ${toPercentText(unified.percent)}`, 'is-loading'];
+            }
+            if (unified.kind === 'init') {
+                return (unified.percent >= 100 || (progress.phase === 'ready' && progress.state === 'done'))
+                    ? ['辨識模型已就緒', 'is-ready']
+                    : [`載入辨識模型 ${toPercentText(unified.percent)}`, 'is-loading'];
+            }
+        }
+        if (progress.phase === 'download' && progress.download?.overall) {
+            return [`載入辨識模型 ${toPercentText(progress.download.overall.percent)}`, 'is-loading'];
+        }
+        if (progress.phase === 'warmup' && progress.warmup?.total) {
+            return [`辨識模型暖機 ${progress.warmup.current}/${progress.warmup.total}`, 'is-loading'];
+        }
+        if (progress.phase === 'ready' && progress.state === 'done') {
+            return ['辨識模型已就緒', 'is-ready'];
+        }
+        if (progress.phase === 'error' || progress.state === 'failed') {
+            return [failText, 'is-error'];
+        }
+        if (progress.state === 'loading' || progress.state === 'creating' || progress.state === 'running') {
+            return ['載入辨識模型...', 'is-loading'];
+        }
+        return null;
+    };
+    const isImageFile = (file) => Boolean(file?.type?.startsWith('image/'));
+    const getFirstImageFile = (files) => Array.from(files || []).find(isImageFile) || null;
+    const getClipboardImageFile = (clipboardData) => {
+        if (!clipboardData) {
+            return null;
+        }
+        const fileFromFiles = getFirstImageFile(clipboardData.files);
+        return fileFromFiles || null;
+    };
+    const dragHasFiles = (event) => Array.from(event?.dataTransfer?.types || []).includes('Files');
+    const setDropOverlayVisible = (visible) => {
+        if (ocrDropOverlay) {
+            ocrDropOverlay.classList.toggle('visible', visible);
+        }
+    };
+
+    const renderOcrProgress = (progress) => {
+        if (!progress) {
+            return;
+        }
+
+        const nextStatus = resolveOcrProgressStatus(progress);
+        if (nextStatus) {
+            setOcrStatus(nextStatus[0], nextStatus[1]);
+        }
+    };
+    const startOcrInitInBackground = () => {
+        if (!window.PPOCRv5) {
+            setOcrStatus('圖片辨識元件未載入，請重新整理頁面', 'is-error');
+            return null;
+        }
+        if (!ocrInitProgressUnsub) {
+            ocrInitProgressUnsub = window.PPOCRv5.onInitProgress(renderOcrProgress);
+        }
+        if (ocrEngine) {
+            return Promise.resolve(ocrEngine);
+        }
+        if (!ocrInitPromise) {
+            setIdleOcrStatus('載入辨識模型...', 'is-loading');
+            ocrInitPromise = window.PPOCRv5.init()
+                .then((engine) => {
+                    ocrEngine = engine;
+                    setIdleOcrStatus('辨識模型已就緒', 'is-ready');
+                    return engine;
+                })
+                .catch((error) => {
+                    ocrInitPromise = null;
+                    ocrEngine = null;
+                    setOcrError('辨識模型載入失敗', error);
+                    throw error;
+                });
+        }
+        return ocrInitPromise;
+    };
+    const ensureOcrEngine = async () => {
+        const initPromise = startOcrInitInBackground();
+        if (!initPromise) {
+            throw new Error('PPOCRv5 plugin not loaded');
+        }
+        return await initPromise;
+    };
+    const runOcrFromFile = async (file) => {
+        if (!isImageFile(file)) {
+            setOcrStatus('請選擇圖片檔', 'is-error');
+            return;
+        }
+        if (ocrProcessing) {
+            setOcrStatus('正在辨識上一張圖片，請稍候', 'is-loading');
+            return;
+        }
+        ocrProcessing = true;
+        try {
+            const engine = await ensureOcrEngine();
+            ocrRecognizing = true;
+            setOcrStatus('辨識中...', 'is-loading');
+            const result = await engine.recognizeFile(file);
+            const text = result?.text || '';
+            if (!text.trim()) {
+                setOcrStatus('圖片中沒有辨識到文字', 'is-error');
+                return;
+            }
+            const createdNew = applyIncomingText(text);
+            setView('output');
+            setOcrStatus(createdNew ? '辨識完成，另存成新的一刀' : '辨識完成', 'is-ready');
+        } catch (error) {
+            setOcrError(ocrRecognizing ? '圖片辨識失敗' : '辨識模型載入失敗', error);
+        } finally {
+            ocrRecognizing = false;
+            ocrProcessing = false;
+        }
+    };
+
+    const isEditableTarget = (target) => target instanceof Element
+        && Boolean(target.closest('input, textarea, [contenteditable="true"]'));
 
     document.addEventListener('paste', (event) => {
         const imageFile = getClipboardImageFile(event.clipboardData);
-        if (!imageFile) {
+        if (imageFile) {
+            event.preventDefault();
+            startOcrInitInBackground();
+            runOcrFromFile(imageFile);
+            return;
+        }
+        // Ctrl+V outside the editors: take the text as a timeline instead of dropping it.
+        const text = event.clipboardData?.getData('text/plain') ?? '';
+        if (isEditableTarget(event.target) || !text.trim()) {
             return;
         }
         event.preventDefault();
-        startOcrInitInBackground();
-        runOcrFromFile(imageFile);
+        pasteText(text);
     }, true);
 
-    if (ocrUploadBtn && ocrFileInput) {
-        ocrUploadBtn.addEventListener('pointerdown', (event) => {
-            event.stopPropagation();
-        });
-
-        ocrUploadBtn.addEventListener('click', (event) => {
+    $$('.js-ocr').forEach((button) => {
+        button.addEventListener('click', (event) => {
             event.preventDefault();
-            event.stopPropagation();
             startOcrInitInBackground();
             ocrFileInput.value = '';
             ocrFileInput.click();
         });
+    });
 
-        ocrFileInput.addEventListener('change', (event) => {
-            const [file] = event.target.files || [];
-            if (file) {
-                runOcrFromFile(file);
-            }
-            event.target.value = '';
-        });
-    }
+    ocrFileInput.addEventListener('change', (event) => {
+        const [file] = event.target.files || [];
+        if (file) {
+            runOcrFromFile(file);
+        }
+        event.target.value = '';
+    });
 
     const prepareForDrop = (event) => {
         if (!dragHasFiles(event)) {
@@ -696,252 +1195,221 @@ document.addEventListener('DOMContentLoaded', () => {
         setDropOverlayVisible(false);
         const imageFile = getFirstImageFile(event.dataTransfer?.files);
         if (!imageFile) {
-            setOcrStatus('拖曳內容不是圖片檔', 'is-error');
+            setOcrStatus('拖曳的內容不是圖片檔', 'is-error');
             return;
         }
         runOcrFromFile(imageFile);
     });
 
-    secondsInput.addEventListener('input', (e) => {
-        let val = parseInt(e.target.value);
-        if (!isNaN(val)) {
-            updateState(val);
+    /* ---------- Popovers (options, more menu) ---------- */
+    let openPopover = null;
+
+    const positionPopover = () => {
+        if (!openPopover) {
+            return;
+        }
+        const { popover, trigger } = openPopover;
+        const asSheet = narrowScreen.matches;
+        popover.classList.toggle('as-sheet', asSheet);
+        popoverBackdrop.hidden = !asSheet;
+        if (asSheet) {
+            popover.style.left = '';
+            popover.style.top = '';
+            return;
+        }
+        const margin = 8;
+        const rect = trigger.getBoundingClientRect();
+        const width = popover.offsetWidth;
+        const height = popover.offsetHeight;
+        const left = Math.max(margin, Math.min(rect.right - width, window.innerWidth - width - margin));
+        let top = rect.bottom + 6;
+        if (top + height > window.innerHeight - margin) {
+            top = Math.max(margin, rect.top - height - 6);
+        }
+        popover.style.left = `${left}px`;
+        popover.style.top = `${top}px`;
+    };
+
+    const closePopover = ({ restoreFocus = true } = {}) => {
+        if (!openPopover) {
+            return;
+        }
+        const { popover, trigger } = openPopover;
+        openPopover = null;
+        popover.hidden = true;
+        popoverBackdrop.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+        if (restoreFocus) {
+            trigger.focus({ preventScroll: true });
+        }
+    };
+
+    const togglePopover = (popover, trigger) => {
+        if (openPopover?.popover === popover) {
+            closePopover();
+            return;
+        }
+        closePopover({ restoreFocus: false });
+        openPopover = { popover, trigger };
+        popover.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+        positionPopover();
+        popover.querySelector('.menu-item:not([hidden]), .switch')?.focus({ preventScroll: true });
+    };
+
+    optionsBtn.addEventListener('click', () => togglePopover(optionsPopover, optionsBtn));
+    moreBtn.addEventListener('click', () => togglePopover(moreMenu, moreBtn));
+    $$('.js-popover-close').forEach((button) => button.addEventListener('click', () => closePopover()));
+    popoverBackdrop.addEventListener('click', () => closePopover({ restoreFocus: false }));
+
+    document.addEventListener('pointerdown', (event) => {
+        if (!openPopover) {
+            return;
+        }
+        const { popover, trigger } = openPopover;
+        if (!popover.contains(event.target) && !trigger.contains(event.target)) {
+            closePopover({ restoreFocus: false });
+        }
+    }, true);
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && openPopover) {
+            event.preventDefault();
+            closePopover();
         }
     });
 
-    secondsSlider.addEventListener('input', (e) => {
-        let val = parseInt(e.target.value);
-        updateState(val);
+    window.addEventListener('resize', positionPopover);
+
+    moreMenu.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+            return;
+        }
+        event.preventDefault();
+        const items = $$('#more-menu .menu-item:not([hidden])');
+        const index = items.indexOf(document.activeElement);
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        items[(index + step + items.length) % items.length]?.focus();
     });
 
-    btnMinus.addEventListener('click', () => {
-        updateState(remainingSeconds - 1);
+    moreMenu.addEventListener('click', (event) => {
+        const item = event.target.closest('.menu-item');
+        if (!item) {
+            return;
+        }
+        const { action } = item.dataset;
+        closePopover({ restoreFocus: action !== 'rename' });
+        if (action === 'rename') {
+            startRenameSlot();
+        } else if (action === 'duplicate') {
+            duplicateActiveSlot();
+        } else if (action === 'delete') {
+            deleteActiveSlot();
+        } else if (action === 'fullscreen') {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                document.documentElement.requestFullscreen().catch(() => { });
+            }
+        }
     });
 
-    btnPlus.addEventListener('click', () => {
-        updateState(remainingSeconds + 1);
-    });
+    /* ---------- Options ---------- */
+    const renderOptionsSummary = () => {
+        const pills = $$('#options-popover .switch[data-summary]')
+            .filter((checkbox) => checkbox.checked)
+            .map((checkbox) => {
+                const pill = document.createElement('span');
+                pill.className = 'summary-pill';
+                pill.textContent = checkbox.dataset.summary;
+                return pill;
+            });
+        optionsSummary.replaceChildren(...pills);
+    };
+
+    const applyWrapLines = (wrap) => {
+        app.classList.toggle('wrap-lines', wrap);
+        inputText.wrap = wrap ? 'soft' : 'off';
+    };
+
+    const applyFontSize = (size) => {
+        const value = ['sm', 'md', 'lg'].includes(size) ? size : 'md';
+        document.documentElement.dataset.fontSize = value;
+        $$('#font-size-group .seg-btn').forEach((button) => {
+            button.setAttribute('aria-checked', String(button.dataset.size === value));
+        });
+    };
 
     strictModeCheckbox.addEventListener('change', (e) => {
         strictMode = e.target.checked;
-        localStorage.setItem('pcr_timeline_strict', strictMode);
+        storage.set('pcr_timeline_strict', strictMode);
         processText();
     });
 
     hideLowTimeCheckbox.addEventListener('change', (e) => {
         hideLowTime = e.target.checked;
-        localStorage.setItem('pcr_timeline_hide_low', hideLowTime);
+        storage.set('pcr_timeline_hide_low', hideLowTime);
         processText();
     });
 
     ignoreCommentCheckbox.addEventListener('change', (e) => {
         matchCommentTime = e.target.checked;
-        localStorage.setItem('pcr_timeline_ignore_comment', matchCommentTime);
+        storage.set('pcr_timeline_ignore_comment', matchCommentTime);
         processText();
     });
 
     highlightTimeCheckbox.addEventListener('change', (e) => {
         highlightTime = e.target.checked;
-        localStorage.setItem('pcr_timeline_highlight_time', highlightTime);
+        storage.set('pcr_timeline_highlight_time', highlightTime);
         processText();
     });
 
-    document.querySelectorAll('.checkbox-wrapper').forEach((wrapper) => {
-        const checkbox = wrapper.querySelector('input[type="checkbox"]');
-        if (!checkbox) {
-            return;
-        }
-
-        wrapper.addEventListener('click', (e) => {
-            if (e.target === checkbox || e.target.closest('label') || e.target.closest('.tooltip-container')) {
-                return;
-            }
-            checkbox.click();
-        });
+    wrapLinesCheckbox.addEventListener('change', (e) => {
+        applyWrapLines(e.target.checked);
+        storage.set('pcr_timeline_wrap', e.target.checked);
     });
 
-    const inputPanel = document.getElementById('input-panel');
-    const inputHeaderToggle = document.getElementById('input-header-toggle');
-    const toggleLabel = inputHeaderToggle.querySelector('.toggle-label');
-    const controlsPanel = document.getElementById('controls-panel');
-    const controlsHeaderToggle = document.getElementById('controls-header-toggle');
-    let updateControlsHeight = () => { };
-    let setControlsCollapsed = null;
-    const appHeader = document.querySelector('.app-header');
-    let headerOverrideVisible = false;
-
-    const updateHeaderState = () => {
-        if (!appHeader) {
-            return;
-        }
-        const shouldCollapse = inputPanel?.classList.contains('collapsed')
-            && controlsPanel?.classList.contains('collapsed')
-            && !headerOverrideVisible;
-
-        document.body.classList.toggle('header-collapsed', shouldCollapse);
-    };
-
-    inputHeaderToggle.addEventListener('click', (event) => {
-        if (event.target instanceof Element
-            && event.target.closest('#ocr-upload-btn, #ocr-file-input')) {
-            return;
-        }
-        inputPanel.classList.toggle('collapsed');
-        const inputCollapsed = inputPanel.classList.contains('collapsed');
-        if (inputCollapsed) {
-            toggleLabel.textContent = "展開原始軸";
-        } else {
-            toggleLabel.textContent = "摺疊";
-        }
-        if (mainContent) {
-            mainContent.classList.toggle('input-collapsed', inputCollapsed);
-            requestAnimationFrame(updateControlsHeight);
-        }
-        if (!inputCollapsed && setControlsCollapsed && window.matchMedia('(min-width: 1024px)').matches) {
-            setControlsCollapsed(false);
-        }
-        headerOverrideVisible = false;
-        updateHeaderState();
+    $$('#options-popover .switch[data-summary]').forEach((checkbox) => {
+        checkbox.addEventListener('change', renderOptionsSummary);
     });
 
-    if (controlsPanel && controlsHeaderToggle && mainContent) {
-        const controlsToggleLabel = controlsHeaderToggle.querySelector('.controls-toggle-label');
-
-        updateControlsHeight = () => {
-            if (controlsPanel.classList.contains('collapsed')) {
-                return;
-            }
-            mainContent.style.setProperty('--controls-height', `${controlsPanel.offsetHeight}px`);
-        };
-
-        updateControlsHeight();
-
-        window.addEventListener('resize', () => {
-            updateControlsHeight();
-            if (window.matchMedia('(min-width: 1024px)').matches
-                && !inputPanel.classList.contains('collapsed')
-                && controlsPanel.classList.contains('collapsed')) {
-                setControlsCollapsed(false);
-            }
-        });
-
-        setControlsCollapsed = (shouldCollapse) => {
-            if (!shouldCollapse) {
-                controlsPanel.classList.remove('collapsed');
-                mainContent.classList.remove('controls-collapsed');
-                controlsHeaderToggle.setAttribute('aria-expanded', 'true');
-                if (controlsToggleLabel) {
-                    controlsToggleLabel.textContent = "摺疊";
-                }
-                requestAnimationFrame(updateControlsHeight);
-                headerOverrideVisible = false;
-                updateHeaderState();
-                return;
-            }
-
-            updateControlsHeight();
-            controlsPanel.classList.add('collapsed');
-            mainContent.classList.add('controls-collapsed');
-            controlsHeaderToggle.setAttribute('aria-expanded', 'false');
-            if (controlsToggleLabel) {
-                controlsToggleLabel.textContent = "展開設定";
-            }
-            headerOverrideVisible = false;
-            updateHeaderState();
-        };
-
-        const toggleControlsPanel = () => {
-            const isCollapsed = controlsPanel.classList.contains('collapsed');
-            setControlsCollapsed(!isCollapsed);
-        };
-
-        controlsHeaderToggle.addEventListener('click', toggleControlsPanel);
-        controlsHeaderToggle.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                toggleControlsPanel();
-            }
-        });
-    }
-
-    const showCopyState = () => {
-        copyBtn.classList.add('copied');
-        btnContentDefault.style.display = 'none';
-        btnContentCopied.style.display = 'flex';
-
-        setTimeout(() => {
-            copyBtn.classList.remove('copied');
-            btnContentDefault.style.display = 'flex';
-            btnContentCopied.style.display = 'none';
-        }, 2000);
-    };
-
-    const fallbackCopy = (text) => {
-        const temp = document.createElement('textarea');
-        temp.value = text;
-        temp.setAttribute('readonly', '');
-        temp.style.position = 'absolute';
-        temp.style.left = '-9999px';
-        document.body.appendChild(temp);
-        temp.select();
-        try {
-            const ok = document.execCommand('copy');
-            if (ok) {
-                showCopyState();
-            }
-        } finally {
-            document.body.removeChild(temp);
-        }
-    };
-
-    copyBtn.addEventListener('click', () => {
-        const text = outputCode.textContent;
-        if (navigator?.clipboard?.writeText) {
-            navigator.clipboard.writeText(text)
-                .then(showCopyState)
-                .catch(() => fallbackCopy(text));
+    fontSizeGroup.addEventListener('click', (event) => {
+        const button = event.target.closest('.seg-btn');
+        if (!button) {
             return;
         }
-        fallbackCopy(text);
+        applyFontSize(button.dataset.size);
+        storage.set('pcr_timeline_font_size', button.dataset.size);
     });
 
-    const fullscreenToggleBtn = document.getElementById('fullscreen-toggle');
+    /* ---------- Fullscreen ---------- */
     const updateFullscreenState = () => {
-        if (!fullscreenToggleBtn) {
-            return;
-        }
         const isFullscreen = Boolean(document.fullscreenElement);
-        fullscreenToggleBtn.classList.toggle('is-fullscreen', isFullscreen);
-        fullscreenToggleBtn.setAttribute('aria-pressed', String(isFullscreen));
-        fullscreenToggleBtn.setAttribute('aria-label', isFullscreen ? '離開全螢幕' : '進入全螢幕');
+        fullscreenToggle.querySelector('.fullscreen-label').textContent = isFullscreen ? '離開全螢幕' : '全螢幕';
     };
 
-    if (fullscreenToggleBtn && document.fullscreenEnabled) {
-        fullscreenToggleBtn.addEventListener('click', () => {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-                return;
-            }
-            document.documentElement.requestFullscreen().catch(() => { });
-        });
+    if (document.fullscreenEnabled) {
+        fullscreenToggle.hidden = false;
         document.addEventListener('fullscreenchange', updateFullscreenState);
         updateFullscreenState();
     }
 
-    const themeToggleBtn = document.getElementById('theme-toggle');
+    /* ---------- Theme ---------- */
+    const themeColors = { light: '#f4f5fa', dark: '#0c0e15' };
 
     const setTheme = (theme) => {
         document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
-    }
+        themeColorMeta?.setAttribute('content', themeColors[theme] || themeColors.light);
+        storage.set('theme', theme);
+    };
 
     const getPreferredTheme = () => {
-        const savedTheme = localStorage.getItem('theme');
+        const savedTheme = storage.get('theme');
         if (savedTheme) {
             return savedTheme;
         }
         return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
+    };
 
     setTheme(getPreferredTheme());
 
@@ -951,141 +1419,48 @@ document.addEventListener('DOMContentLoaded', () => {
         setTheme(newTheme);
     });
 
+    /* ---------- Init ---------- */
     initSlots();
 
-    const savedSeconds = localStorage.getItem('pcr_timeline_seconds');
+    const savedSeconds = storage.get('pcr_timeline_seconds');
     if (savedSeconds !== null) {
         updateState(parseInt(savedSeconds, 10));
     }
 
-    const savedStrict = localStorage.getItem('pcr_timeline_strict');
+    const savedStrict = storage.get('pcr_timeline_strict');
     if (savedStrict !== null) {
         strictMode = (savedStrict === 'true');
         strictModeCheckbox.checked = strictMode;
     }
 
-    const savedHideLow = localStorage.getItem('pcr_timeline_hide_low');
+    const savedHideLow = storage.get('pcr_timeline_hide_low');
     if (savedHideLow !== null) {
         hideLowTime = (savedHideLow === 'true');
         hideLowTimeCheckbox.checked = hideLowTime;
     }
 
-    const savedIgnoreComment = localStorage.getItem('pcr_timeline_ignore_comment');
+    const savedIgnoreComment = storage.get('pcr_timeline_ignore_comment');
     if (savedIgnoreComment !== null) {
         matchCommentTime = (savedIgnoreComment === 'true');
         ignoreCommentCheckbox.checked = matchCommentTime;
     }
 
-    const savedHighlightTime = localStorage.getItem('pcr_timeline_highlight_time');
+    const savedHighlightTime = storage.get('pcr_timeline_highlight_time');
     if (savedHighlightTime !== null) {
         highlightTime = (savedHighlightTime === 'true');
         highlightTimeCheckbox.checked = highlightTime;
     }
 
-    setOcrStatus(window.PPOCRv5 ? 'OCR 待命' : 'OCR plugin 未載入', window.PPOCRv5 ? '' : 'is-error');
+    const savedWrap = storage.get('pcr_timeline_wrap');
+    wrapLinesCheckbox.checked = savedWrap === null ? true : savedWrap === 'true';
+    applyWrapLines(wrapLinesCheckbox.checked);
+    applyFontSize(storage.get('pcr_timeline_font_size'));
 
-    processText();
-    updateHeaderState();
-
-    let lastTouchY = null;
-    const isInsideCode = (target) => target instanceof Element
-        && target.closest('.code-content, pre, code');
-    const shouldHandleTouch = (event) => event.touches.length === 1 && !isInsideCode(event.target);
-
-    window.addEventListener('touchstart', (event) => {
-        if (!shouldHandleTouch(event)) {
-            lastTouchY = null;
-            return;
-        }
-        lastTouchY = event.touches[0].clientY;
-    }, { passive: true });
-
-    window.addEventListener('touchmove', (event) => {
-        if (!shouldHandleTouch(event) || lastTouchY === null) {
-            return;
-        }
-
-        const currentY = event.touches[0].clientY;
-        const deltaY = lastTouchY - currentY;
-        const threshold = 1;
-
-        if (deltaY > threshold) {
-            headerOverrideVisible = false;
-            updateHeaderState();
-        } else if (deltaY < -threshold) {
-            headerOverrideVisible = true;
-            updateHeaderState();
-        }
-
-        lastTouchY = currentY;
-    }, { passive: true });
-
-    window.addEventListener('touchend', () => {
-        lastTouchY = null;
-    }, { passive: true });
-
-    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-        window.addEventListener('mousemove', (event) => {
-            const thresholdY = window.innerHeight * 0.04;
-            if (event.clientY <= thresholdY) {
-                if (!headerOverrideVisible) {
-                    headerOverrideVisible = true;
-                    updateHeaderState();
-                }
-                return;
-            }
-
-            if (headerOverrideVisible) {
-                headerOverrideVisible = false;
-                updateHeaderState();
-            }
-        });
+    if (!window.PPOCRv5) {
+        ocrUploadBtn.title = '圖片辨識元件未載入';
     }
 
-    const tooltipContainers = document.querySelectorAll('.tooltip-container');
-    tooltipContainers.forEach(container => {
-        const tooltip = container.querySelector('.tooltip');
-        if (!tooltip) return;
-
-        const wrapper = container.closest('.checkbox-wrapper');
-
-        const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-
-        const adjustPosition = () => {
-            const rect = tooltip.getBoundingClientRect();
-            const containerRect = container.getBoundingClientRect();
-            const wrapperRect = wrapper ? wrapper.getBoundingClientRect() : containerRect;
-            const viewportWidth = window.innerWidth;
-            const margin = 10;
-            const tooltipWidth = rect.width;
-            const viewportLeft = margin;
-            const viewportRight = viewportWidth - margin;
-            const maxLeft = viewportRight - tooltipWidth;
-
-            const baseLeft = containerRect.right - tooltipWidth;
-            const leftIdeal = wrapperRect.left;
-            const rightIdeal = wrapperRect.right - tooltipWidth;
-
-            const leftAligned = clamp(leftIdeal, viewportLeft, maxLeft);
-            const rightAligned = clamp(rightIdeal, viewportLeft, maxLeft);
-            const desiredLeft = (Math.abs(rightAligned - rightIdeal) <= Math.abs(leftAligned - leftIdeal))
-                ? rightAligned
-                : leftAligned;
-
-            const offsetX = desiredLeft - baseLeft;
-
-            const targetX = containerRect.left + (containerRect.width / 2);
-            const arrowRight = 8;
-            const safeMargin = 14;
-            const arrowTip = clamp(targetX, desiredLeft + safeMargin, desiredLeft + tooltipWidth - safeMargin);
-            const defaultArrowTip = desiredLeft + tooltipWidth - arrowRight;
-            const arrowOffsetX = arrowTip - defaultArrowTip;
-
-            tooltip.style.setProperty('--tooltip-offset-x', `${offsetX + 3}px`);
-            tooltip.style.setProperty('--tooltip-arrow-offset-x', `${arrowOffsetX + 3}px`);
-        };
-
-        container.addEventListener('mouseenter', adjustPosition);
-        container.addEventListener('mousemove', adjustPosition);
-    });
+    renderSeconds();
+    renderOptionsSummary();
+    processText();
 });
