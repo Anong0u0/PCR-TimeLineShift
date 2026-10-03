@@ -27,12 +27,12 @@
     --success: #23935c;
     --warning: #c26a06;
 
-    /* Result pane: a lavender tint and accent frame, so it stands apart from both the white input and the page */
-    --code-bg: #ededfc;
-    --code-head: #e1e2f9;
-    --code-foot: #ededfc;
-    --code-border: #c3c5f1;
-    --code-rule: #cfd1f5;
+    /* Result pane: near-white body with an accent frame and header bar, so it stands apart from the page */
+    --code-bg: #fbfbff;
+    --code-head: #e8e8fc;
+    --code-foot: #fbfbff;
+    --code-border: #bfc1f0;
+    --code-rule: #d3d4f6;
     --code-title: #4242b5;
     --code-text: #262a3d;
     --tok-number: #3a54d4;
