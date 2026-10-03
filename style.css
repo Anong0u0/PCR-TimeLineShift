@@ -27,10 +27,13 @@
     --success: #23935c;
     --warning: #c26a06;
 
-    /* Result pane: a light tint so it reads apart from the white input */
-    --code-bg: #f2f2fc;
-    --code-head: #e8e8f8;
-    --code-foot: #f2f2fc;
+    /* Result pane: a lavender tint and accent frame, so it stands apart from both the white input and the page */
+    --code-bg: #ededfc;
+    --code-head: #e1e2f9;
+    --code-foot: #ededfc;
+    --code-border: #c3c5f1;
+    --code-rule: #cfd1f5;
+    --code-title: #4242b5;
     --code-text: #262a3d;
     --tok-number: #3a54d4;
     --tok-comment: #1b7a4c;
@@ -84,6 +87,9 @@
     --code-bg: #0f121a;
     --code-head: #131722;
     --code-foot: #131722;
+    --code-border: #252a3a;
+    --code-rule: #252a3a;
+    --code-title: #e8eaf3;
     --code-text: #d9dcea;
     --tok-number: #8db4ff;
     --tok-comment: #67cf90;
@@ -1376,10 +1382,16 @@ code {
 
 .pane-output {
     background: var(--code-bg);
+    border-color: var(--code-border);
 }
 
 .pane-output .pane-head {
     background: var(--code-head);
+    border-bottom-color: var(--code-rule);
+}
+
+.pane-output .pane-title {
+    color: var(--code-title);
 }
 
 .code-content {
@@ -1466,7 +1478,7 @@ pre {
     gap: 4px 14px;
     min-height: 34px;
     padding: 6px 16px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--code-rule);
     background: var(--code-foot);
     font-size: 12px;
     color: var(--muted);
