@@ -34,6 +34,7 @@
     --code-border: #bfc1f0;
     --code-rule: #d3d4f6;
     --code-title: #4242b5;
+    --code-tag: #ffffff;
     --code-text: #262a3d;
     --tok-number: #3a54d4;
     --tok-comment: #1b7a4c;
@@ -90,6 +91,7 @@
     --code-border: #252a3a;
     --code-rule: #252a3a;
     --code-title: #e8eaf3;
+    --code-tag: var(--accent-soft);
     --code-text: #d9dcea;
     --tok-number: #8db4ff;
     --tok-comment: #67cf90;
@@ -1392,6 +1394,10 @@ code {
 
 .pane-output .pane-title {
     color: var(--code-title);
+}
+
+.pane-output .pane-tag-accent {
+    background: var(--code-tag);
 }
 
 .code-content {
