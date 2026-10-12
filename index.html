@@ -24,7 +24,7 @@
     <meta property="og:site_name" content="PCR Timeline Shift" />
     <meta property="og:locale" content="zh_TW" />
     <meta property="og:image"
-        content="https://anong0u0.github.io/PCR-TimeLineShift/public/og/og-image.png?v=20261003-b" />
+        content="https://anong0u0.github.io/PCR-TimeLineShift/public/og/og-image.png?v=20261012" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -34,7 +34,7 @@
     <meta name="twitter:title" content="公主連結補償刀時間軸轉換工具" />
     <meta name="twitter:description" content="《公主連結 Re:Dive》補償刀時間軸轉換工具，依剩餘秒數平移時間軸並提供即時預覽。" />
     <meta name="twitter:image"
-        content="https://anong0u0.github.io/PCR-TimeLineShift/public/og/og-image.png?v=20261003-b" />
+        content="https://anong0u0.github.io/PCR-TimeLineShift/public/og/og-image.png?v=20261012" />
     <meta name="twitter:image:alt" content="公主連結補償刀時間軸轉換工具預覽圖" />
     <meta name="twitter:url" content="https://anong0u0.github.io/PCR-TimeLineShift/" />
 
@@ -62,7 +62,7 @@
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Source+Code+Pro:wght@400;500;600&display=swap"
         rel="stylesheet">
 
-    <link rel="stylesheet" href="style.css?v=20261003-4">
+    <link rel="stylesheet" href="style.css?v=20261012-1">
 </head>
 
 <body>
@@ -98,12 +98,6 @@
                 stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2"></rect>
                 <path d="M9 3v18"></path>
-            </symbol>
-            <symbol id="i-type" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 7V4h16v3"></path>
-                <path d="M9 20h6"></path>
-                <path d="M12 4v16"></path>
             </symbol>
             <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -187,6 +181,20 @@
                 <path d="M9 21H3v-6"></path>
                 <path d="m21 3-7 7"></path>
                 <path d="m3 21 7-7"></path>
+            </symbol>
+            <symbol id="i-minimize" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 14h6v6"></path>
+                <path d="M20 10h-6V4"></path>
+                <path d="m14 10 7-7"></path>
+                <path d="m3 21 7-7"></path>
+            </symbol>
+            <symbol id="i-wrap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M3 12h15a3 3 0 1 1 0 6h-4"></path>
+                <path d="m16 16-2 2 2 2"></path>
+                <path d="M3 18h7"></path>
             </symbol>
             <symbol id="i-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -276,13 +284,28 @@
                         <span class="btn-label">圖片辨識</span>
                     </button>
                     <input id="ocr-file-input" type="file" accept="image/*" hidden>
+                    <div class="display-tools" role="group" aria-label="顯示設定">
+                        <button id="wrap-toggle" class="icon-btn toggle-btn" type="button" aria-pressed="true"
+                            aria-label="自動換行" title="自動換行：開（點擊關閉，改為左右捲動）">
+                            <svg class="icon"><use href="#i-wrap"></use></svg>
+                        </button>
+                        <div class="segmented segmented-xs" role="radiogroup" aria-label="文字大小" id="font-size-group">
+                            <button type="button" class="seg-btn" role="radio" data-size="sm" aria-checked="false"
+                                title="文字大小：小">小</button>
+                            <button type="button" class="seg-btn" role="radio" data-size="md" aria-checked="true"
+                                title="文字大小：中">中</button>
+                            <button type="button" class="seg-btn" role="radio" data-size="lg" aria-checked="false"
+                                title="文字大小：大">大</button>
+                        </div>
+                        <button id="fullscreen-toggle" class="icon-btn" type="button" aria-pressed="false"
+                            aria-label="全螢幕" title="全螢幕" hidden>
+                            <svg class="icon fullscreen-icon-enter"><use href="#i-maximize"></use></svg>
+                            <svg class="icon fullscreen-icon-exit"><use href="#i-minimize"></use></svg>
+                        </button>
+                    </div>
                     <button id="theme-toggle" class="icon-btn" type="button" aria-label="切換深色模式" title="切換深色模式">
                         <svg class="icon theme-icon-moon"><use href="#i-moon"></use></svg>
                         <svg class="icon theme-icon-sun"><use href="#i-sun"></use></svg>
-                    </button>
-                    <button id="more-btn" class="icon-btn" type="button" aria-label="更多動作" title="更多動作"
-                        aria-haspopup="menu" aria-expanded="false" aria-controls="more-menu">
-                        <svg class="icon"><use href="#i-more"></use></svg>
                     </button>
                 </div>
             </header>
@@ -451,26 +474,6 @@
         </main>
     </div>
 
-    <!-- More menu -->
-    <div id="more-menu" class="popover menu" role="menu" aria-label="更多動作" hidden>
-        <button type="button" class="menu-item" role="menuitem" data-action="rename">
-            <svg class="icon"><use href="#i-pencil"></use></svg>重新命名
-        </button>
-        <button type="button" class="menu-item" role="menuitem" data-action="duplicate">
-            <svg class="icon"><use href="#i-files"></use></svg>建立複本
-        </button>
-        <button type="button" class="menu-item menu-item-danger" role="menuitem" data-action="delete">
-            <svg class="icon"><use href="#i-trash"></use></svg>刪除這刀
-        </button>
-        <div class="menu-sep" role="separator"></div>
-        <button type="button" class="menu-item" role="menuitem" data-action="display">
-            <svg class="icon"><use href="#i-type"></use></svg>顯示設定（換行、字級）
-        </button>
-        <button type="button" class="menu-item" role="menuitem" data-action="fullscreen" id="fullscreen-toggle" hidden>
-            <svg class="icon"><use href="#i-maximize"></use></svg><span class="fullscreen-label">全螢幕</span>
-        </button>
-    </div>
-
     <!-- Per-刀 menu (left list) -->
     <div id="slot-menu" class="popover menu" role="menu" aria-label="這刀的動作" hidden>
         <button type="button" class="menu-item" role="menuitem" data-action="rename">
@@ -482,33 +485,6 @@
         <button type="button" class="menu-item menu-item-danger" role="menuitem" data-action="delete">
             <svg class="icon"><use href="#i-trash"></use></svg>刪除
         </button>
-    </div>
-
-    <!-- Display settings -->
-    <div id="display-popover" class="popover options-popover" role="dialog" aria-labelledby="display-title" hidden>
-        <div class="popover-head">
-            <h2 id="display-title" class="popover-title">顯示設定</h2>
-            <button type="button" class="icon-btn js-popover-close" aria-label="關閉">
-                <svg class="icon"><use href="#i-x"></use></svg>
-            </button>
-        </div>
-        <label class="option" for="wrap-lines">
-            <span class="option-text">
-                <span class="option-title">自動換行</span>
-                <span class="option-desc">過長的行自動折行，關閉時改為左右捲動。</span>
-            </span>
-            <input type="checkbox" class="switch" id="wrap-lines" checked>
-        </label>
-        <div class="option">
-            <span class="option-text">
-                <span class="option-title">文字大小</span>
-            </span>
-            <div class="segmented segmented-sm" role="radiogroup" aria-label="文字大小" id="font-size-group">
-                <button type="button" class="seg-btn" role="radio" data-size="sm" aria-checked="false">小</button>
-                <button type="button" class="seg-btn" role="radio" data-size="md" aria-checked="true">中</button>
-                <button type="button" class="seg-btn" role="radio" data-size="lg" aria-checked="false">大</button>
-            </div>
-        </div>
     </div>
 
     <div id="popover-backdrop" class="popover-backdrop" hidden></div>
@@ -526,7 +502,7 @@
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="ppocrv5.plugin.js?v=20260227"></script>
-    <script src="script.js?v=20261003"></script>
+    <script src="script.js?v=20261012-1"></script>
 </body>
 
 </html>

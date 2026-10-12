@@ -291,6 +291,11 @@ code {
         background: var(--surface-2);
         color: var(--text);
     }
+
+    .toggle-btn[aria-pressed="true"]:hover {
+        background: var(--accent-soft-2);
+        color: var(--accent-text);
+    }
 }
 
 /* =========================================
@@ -698,6 +703,27 @@ code {
     align-items: center;
     gap: 4px;
     flex-shrink: 0;
+}
+
+/* Display settings sit right in the top bar: wrap, text size, fullscreen */
+.display-tools {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.toggle-btn[aria-pressed="true"] {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+}
+
+.fullscreen-icon-exit,
+#fullscreen-toggle[aria-pressed="true"] .fullscreen-icon-enter {
+    display: none;
+}
+
+#fullscreen-toggle[aria-pressed="true"] .fullscreen-icon-exit {
+    display: block;
 }
 
 .ocr-btn {
@@ -1631,10 +1657,15 @@ pre {
     box-shadow: var(--shadow-1), 0 0 0 1px var(--border);
 }
 
-.segmented-sm .seg-btn {
-    min-width: 40px;
-    height: 28px;
-    padding: 0 10px;
+.segmented-xs {
+    padding: 2px;
+    border-radius: 10px;
+}
+
+.segmented-xs .seg-btn {
+    min-width: 30px;
+    height: 30px;
+    padding: 0 6px;
     font-size: 13px;
 }
 
@@ -1684,17 +1715,6 @@ pre {
     color: var(--danger);
 }
 
-.menu-sep {
-    height: 1px;
-    margin: 6px 4px;
-    background: var(--border);
-}
-
-.menu-sep:last-child,
-.menu-sep:has(+ [hidden]:last-child) {
-    display: none;
-}
-
 @media (hover: hover) and (pointer: fine) {
     .menu-item:hover {
         background: var(--surface-2);
@@ -1708,107 +1728,6 @@ pre {
 .menu-item:focus-visible {
     outline: none;
     background: var(--surface-2);
-}
-
-.options-popover {
-    width: 360px;
-    max-width: calc(100vw - 24px);
-    max-height: calc(100dvh - 32px);
-    overflow-y: auto;
-    padding: 8px 8px 10px;
-}
-
-.popover-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 4px 6px 12px;
-}
-
-.popover-title {
-    font-size: 15px;
-    font-weight: 700;
-}
-
-.option {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 10px 12px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-}
-
-div.option {
-    cursor: default;
-}
-
-.option-text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.option-title {
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.option-desc {
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--muted);
-}
-
-.option-desc code {
-    padding: 0 3px;
-    border-radius: 4px;
-    background: var(--surface-2);
-    font-size: 11px;
-    color: var(--text-2);
-}
-
-@media (hover: hover) and (pointer: fine) {
-    label.option:hover {
-        background: var(--surface-2);
-    }
-}
-
-.switch {
-    position: relative;
-    width: 42px;
-    height: 24px;
-    flex-shrink: 0;
-    margin: 0;
-    border-radius: 999px;
-    background: var(--surface-3);
-    -webkit-appearance: none;
-    appearance: none;
-    cursor: pointer;
-    transition: background-color 0.18s;
-}
-
-.switch::before {
-    content: "";
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-    transition: transform 0.18s cubic-bezier(0.3, 0.7, 0.4, 1.3);
-}
-
-.switch:checked {
-    background: var(--accent);
-}
-
-.switch:checked::before {
-    transform: translateX(18px);
 }
 
 .popover-backdrop {
@@ -2173,6 +2092,28 @@ div.option {
         display: none;
     }
 
+    /* Room for the display settings: the 刀 name may shorten, the strip below shows it in full */
+    .slot-title {
+        min-width: 0;
+    }
+
+    .topbar-actions,
+    .display-tools {
+        gap: 2px;
+    }
+
+    .topbar-actions .icon-btn,
+    .topbar-actions .ocr-btn {
+        width: 34px;
+        height: 36px;
+    }
+
+    .segmented-xs .seg-btn {
+        min-width: 26px;
+        height: 28px;
+        padding: 0 4px;
+    }
+
     .shift-card {
         grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
@@ -2346,6 +2287,16 @@ div.option {
 }
 
 @media (max-width: 380px) {
+    .topbar-actions .icon-btn,
+    .topbar-actions .ocr-btn {
+        width: 32px;
+    }
+
+    .segmented-xs .seg-btn {
+        min-width: 22px;
+        padding: 0 3px;
+    }
+
     .shift-label {
         min-width: 0;
     }
@@ -2381,6 +2332,13 @@ div.option {
     .step-btn {
         width: 38px;
         height: 38px;
+    }
+}
+
+/* Tiny phones: the clock mark gives its room to the 刀 name */
+@media (max-width: 340px) {
+    .topbar-mark {
+        display: none;
     }
 }
 

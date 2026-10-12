@@ -18,9 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const hideLowTimeCheckbox = $('#hide-low-time');
     const ignoreCommentCheckbox = $('#ignore-comment');
     const highlightTimeCheckbox = $('#highlight-time');
-    const wrapLinesCheckbox = $('#wrap-lines');
+    const wrapToggle = $('#wrap-toggle');
     const fontSizeGroup = $('#font-size-group');
-    const displayPopover = $('#display-popover');
     const optionsSummary = $('#options-summary');
     const controlsCard = $('#controls-card');
     const controlsCollapseBtn = $('#controls-collapse');
@@ -30,8 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebarExpandBtn = $('#sidebar-expand');
     const slotMenu = $('#slot-menu');
     const tooltip = $('#tooltip');
-    const moreBtn = $('#more-btn');
-    const moreMenu = $('#more-menu');
     const popoverBackdrop = $('#popover-backdrop');
     const toastRegion = $('#toast-region');
     const ocrUploadBtn = $('#ocr-upload-btn');
@@ -739,11 +736,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const startRenameSlot = () => {
-        slotTitle.focus();
-        slotTitle.select();
-    };
-
     let listRenderPending = false;
 
     // Rename right inside the list: Enter or leaving the field saves, Esc cancels.
@@ -1433,7 +1425,7 @@ document.addEventListener('DOMContentLoaded', () => {
         popover.hidden = false;
         trigger.setAttribute('aria-expanded', 'true');
         positionPopover();
-        popover.querySelector('.menu-item:not([hidden]), .switch')?.focus({ preventScroll: true });
+        popover.querySelector('.menu-item:not([hidden])')?.focus({ preventScroll: true });
     };
 
     let menuSlotId = null;
@@ -1442,8 +1434,6 @@ document.addEventListener('DOMContentLoaded', () => {
         togglePopover(slotMenu, trigger);
     };
 
-    moreBtn.addEventListener('click', () => togglePopover(moreMenu, moreBtn));
-    $$('.js-popover-close').forEach((button) => button.addEventListener('click', () => closePopover()));
     popoverBackdrop.addEventListener('click', () => closePopover({ restoreFocus: false }));
 
     document.addEventListener('pointerdown', (event) => {
@@ -1465,17 +1455,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('resize', positionPopover);
 
-    [moreMenu, slotMenu].forEach((menu) => {
-        menu.addEventListener('keydown', (event) => {
-            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
-                return;
-            }
-            event.preventDefault();
-            const items = Array.from(menu.querySelectorAll('.menu-item:not([hidden])'));
-            const index = items.indexOf(document.activeElement);
-            const step = event.key === 'ArrowDown' ? 1 : -1;
-            items[(index + step + items.length) % items.length]?.focus();
-        });
+    slotMenu.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+            return;
+        }
+        event.preventDefault();
+        const items = Array.from(slotMenu.querySelectorAll('.menu-item:not([hidden])'));
+        const index = items.indexOf(document.activeElement);
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        items[(index + step + items.length) % items.length]?.focus();
     });
 
     slotMenu.addEventListener('click', (event) => {
@@ -1497,30 +1485,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // The menu is gone and the list re-rendered: keep keyboard focus in the list.
         focusActiveItem();
-    });
-
-    moreMenu.addEventListener('click', (event) => {
-        const item = event.target.closest('.menu-item');
-        if (!item) {
-            return;
-        }
-        const { action } = item.dataset;
-        closePopover({ restoreFocus: action !== 'rename' && action !== 'display' });
-        if (action === 'rename') {
-            startRenameSlot();
-        } else if (action === 'duplicate') {
-            duplicateSlot(activeSlotId);
-        } else if (action === 'delete') {
-            deleteSlot(activeSlotId);
-        } else if (action === 'display') {
-            togglePopover(displayPopover, moreBtn);
-        } else if (action === 'fullscreen') {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            } else {
-                document.documentElement.requestFullscreen().catch(() => { });
-            }
-        }
     });
 
     /* ---------- Option tooltips ---------- */
@@ -1734,6 +1698,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const applyWrapLines = (wrap) => {
         app.classList.toggle('wrap-lines', wrap);
         inputText.wrap = wrap ? 'soft' : 'off';
+        wrapToggle.setAttribute('aria-pressed', String(wrap));
+        wrapToggle.title = wrap ? '自動換行：開（點擊關閉，改為左右捲動）' : '自動換行：關（點擊開啟）';
     };
 
     const applyFontSize = (size) => {
@@ -1768,9 +1734,10 @@ document.addEventListener('DOMContentLoaded', () => {
         processText();
     });
 
-    wrapLinesCheckbox.addEventListener('change', (e) => {
-        applyWrapLines(e.target.checked);
-        storage.set('pcr_timeline_wrap', e.target.checked);
+    wrapToggle.addEventListener('click', () => {
+        const wrap = wrapToggle.getAttribute('aria-pressed') !== 'true';
+        applyWrapLines(wrap);
+        storage.set('pcr_timeline_wrap', wrap);
     });
 
     $$('.shift-options input[data-summary]').forEach((checkbox) => {
@@ -1789,11 +1756,21 @@ document.addEventListener('DOMContentLoaded', () => {
     /* ---------- Fullscreen ---------- */
     const updateFullscreenState = () => {
         const isFullscreen = Boolean(document.fullscreenElement);
-        fullscreenToggle.querySelector('.fullscreen-label').textContent = isFullscreen ? '離開全螢幕' : '全螢幕';
+        const label = isFullscreen ? '離開全螢幕' : '全螢幕';
+        fullscreenToggle.setAttribute('aria-pressed', String(isFullscreen));
+        fullscreenToggle.setAttribute('aria-label', label);
+        fullscreenToggle.title = label;
     };
 
     if (document.fullscreenEnabled) {
         fullscreenToggle.hidden = false;
+        fullscreenToggle.addEventListener('click', () => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => { });
+            } else {
+                document.documentElement.requestFullscreen().catch(() => { });
+            }
+        });
         document.addEventListener('fullscreenchange', updateFullscreenState);
         updateFullscreenState();
     }
@@ -1856,8 +1833,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const savedWrap = storage.get('pcr_timeline_wrap');
-    wrapLinesCheckbox.checked = savedWrap === null ? true : savedWrap === 'true';
-    applyWrapLines(wrapLinesCheckbox.checked);
+    applyWrapLines(savedWrap === null ? true : savedWrap === 'true');
     applyFontSize(storage.get('pcr_timeline_font_size'));
 
     setControlsCollapsed(storage.get(collapseKeys.controls) === 'true', false);
