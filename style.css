@@ -17,6 +17,7 @@
 
     --accent: #5a5bd8;
     --accent-hover: #4a4bc6;
+    --accent-solid: #5a5bd8;
     --accent-soft: #ededfd;
     --accent-soft-2: #dfe0fb;
     --accent-text: #4242b5;
@@ -67,16 +68,19 @@
     --surface-2: #1b1f2c;
     --surface-3: #252a3b;
     --border: #252a3a;
-    --border-strong: #353b51;
+    --border-strong: #666b81;
 
     --text: #e8eaf3;
     --text-2: #b9bed0;
     --muted: #8a90a7;
 
+    /* Lines and icons use a lighter indigo; filled buttons keep the light theme's indigo so white labels read clearly */
     --accent: #6f71ee;
-    --accent-hover: #8183f3;
-    --accent-soft: rgba(129, 131, 244, 0.14);
-    --accent-soft-2: rgba(129, 131, 244, 0.24);
+    --accent-hover: #4f50cc;
+    --accent-solid: #5a5bd8;
+    /* The light theme's lavender tints, as solid colours */
+    --accent-soft: #23223a;
+    --accent-soft-2: #36346a;
     --accent-text: #b2b3fb;
     --on-accent: #ffffff;
 
@@ -85,13 +89,14 @@
     --success: #4cc98a;
     --warning: #f0a54a;
 
+    /* Result pane: the code body stays dark; a lavender header bar marks it, as in the light theme */
     --code-bg: #0f121a;
-    --code-head: #131722;
-    --code-foot: #131722;
+    --code-head: #23233e;
+    --code-foot: #0f121a;
     --code-border: #252a3a;
-    --code-rule: #252a3a;
-    --code-title: #e8eaf3;
-    --code-tag: var(--accent-soft);
+    --code-rule: #313153;
+    --code-title: #b2b3fb;
+    --code-tag: #2d2b50;
     --code-text: #d9dcea;
     --tok-number: #8db4ff;
     --tok-comment: #67cf90;
@@ -234,7 +239,7 @@ code {
 }
 
 .btn-primary {
-    background: var(--accent);
+    background: var(--accent-solid);
     color: var(--on-accent);
     box-shadow: 0 1px 2px rgba(64, 66, 200, 0.25);
 }
@@ -1008,6 +1013,15 @@ code {
     box-shadow: 0 0 0 1px var(--accent), 0 2px 6px rgba(64, 66, 200, 0.35);
 }
 
+/* A light ring around the thumb, like the white one in the light theme. Kept as two rules: one unknown pseudo-element drops a whole selector list */
+[data-theme="dark"] .slider::-webkit-slider-thumb {
+    border-color: #bfc1f0;
+}
+
+[data-theme="dark"] .slider::-moz-range-thumb {
+    border-color: #bfc1f0;
+}
+
 .slider:active::-webkit-slider-thumb,
 .slider:focus-visible::-webkit-slider-thumb {
     transform: scale(1.12);
@@ -1426,6 +1440,11 @@ code {
     background: var(--code-tag);
 }
 
+/* Keep keyboard focus visible on the lavender header bar */
+[data-theme="dark"] .pane-output .pane-head :focus-visible {
+    outline-color: #8183f3;
+}
+
 .code-content {
     position: relative;
     flex: 1;
@@ -1563,6 +1582,11 @@ pre {
     color: #fff;
 }
 
+/* White on the dark theme's lighter green is too faint */
+[data-theme="dark"] .js-copy.copied {
+    color: #0c0e15;
+}
+
 /* empty state */
 .empty-state {
     position: absolute;
@@ -1583,6 +1607,11 @@ pre {
     margin-bottom: 4px;
     color: var(--accent);
     opacity: 0.7;
+}
+
+[data-theme="dark"] .empty-icon {
+    color: var(--accent-text);
+    opacity: 0.55;
 }
 
 .empty-title {
@@ -1657,6 +1686,13 @@ pre {
     box-shadow: var(--shadow-1), 0 0 0 1px var(--border);
 }
 
+/* The chosen segment sits above its track, as in the light theme */
+[data-theme="dark"] .seg-btn[aria-selected="true"],
+[data-theme="dark"] .seg-btn[aria-checked="true"] {
+    background: #252939;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px #393f53;
+}
+
 .segmented-xs {
     padding: 2px;
     border-radius: 10px;
@@ -1682,6 +1718,13 @@ pre {
     border-radius: var(--radius);
     box-shadow: var(--shadow-2);
     animation: pop-in 0.14s ease-out;
+}
+
+/* Menus are lighter than what they cover, so 刪除 takes a lighter red to stay readable on hover and focus */
+[data-theme="dark"] .popover {
+    --danger: #ff8085;
+    background: #252939;
+    border-color: #393f53;
 }
 
 @keyframes pop-in {
@@ -1723,11 +1766,19 @@ pre {
     .menu-item-danger:hover {
         background: var(--danger-soft);
     }
+
+    [data-theme="dark"] .menu-item:not(.menu-item-danger):hover {
+        background: #2f3546;
+    }
 }
 
 .menu-item:focus-visible {
     outline: none;
     background: var(--surface-2);
+}
+
+[data-theme="dark"] .menu-item:focus-visible {
+    background: #2f3546;
 }
 
 .popover-backdrop {
@@ -1978,8 +2029,8 @@ pre {
     }
 
     .slot-item.active {
-        background: var(--accent);
-        border-color: var(--accent);
+        background: var(--accent-solid);
+        border-color: var(--accent-solid);
         color: var(--on-accent);
     }
 
@@ -2267,6 +2318,10 @@ pre {
         margin: 2px auto 8px;
         border-radius: 999px;
         background: var(--surface-3);
+    }
+
+    [data-theme="dark"] .popover.as-sheet::before {
+        background: #555869;
     }
 
     .popover.as-sheet .menu-item {
